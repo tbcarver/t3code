@@ -73,12 +73,19 @@ jobs:
           VP_NODE_VERSION: "26.8.2"
         run: node apps/server/scripts/cli.ts build-exe --verbose
 
+      - name: Build resource monitor
+        run: |
+          cargo build --release --manifest-path native/resource-monitor/Cargo.toml
+          mkdir -p "$RUNNER_TEMP/resource-monitor"
+          cp native/resource-monitor/target/release/t3-resource-monitor "$RUNNER_TEMP/resource-monitor/"
+
       - name: Build CLI archive
         run: |
           node scripts/build-cli-archive.ts \
             --platform linux \
             --arch x64 \
             --version "${{ steps.version.outputs.version }}" \
+            --resource-monitor-dir "$RUNNER_TEMP/resource-monitor" \
             --output-dir release-cli
 
       - name: Upload CLI archive
