@@ -13,7 +13,69 @@ permissions:
   contents: read
 
 jobs:
+  # The Windows desktop build embeds a Linux CLI archive as its WSL backend
+  # (apps/desktop's WSL support runs that archive inside the distro). Without
+  # it, `dist:desktop:win:x64` still succeeds but silently omits WSL support.
+  linux-cli-archive:
+    name: Build Linux CLI archive (for Windows WSL support)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+
+      - name: Install Linux desktop build libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-dev pkg-config imagemagick
+
+      - name: Copy public build config
+        run: cp .env.example .env
+
+      - name: Install dependencies
+        run: corepack pnpm install
+
+      - name: Resolve archive version
+        id: version
+        run: echo "version=$(node -p "require('./apps/server/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # Needs a Node that supports --build-sea (25.7+); the build tooling
+      # downloads that Node version itself, independent of the repo's Node.
+      - name: Build CLI single-executable
+        run: node apps/server/scripts/cli.ts build-exe --verbose
+
+      - name: Build CLI archive
+        run: |
+          node scripts/build-cli-archive.ts \
+            --platform linux \
+            --arch x64 \
+            --version "${{ steps.version.outputs.version }}" \
+            --output-dir release-cli
+
+      - name: Upload CLI archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cli-linux-x64
+          path: release-cli/*
+          if-no-files-found: error
+
   build:
+    needs: linux-cli-archive
     strategy:
       fail-fast: false
       matrix:
@@ -62,7 +124,17 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install
 
+      - name: Download Linux CLI archive for WSL
+        if: matrix.label == 'windows-x64'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cli-linux-x64
+          path: wsl-runtime
+
       - name: Build desktop installer
+        shell: bash
+        env:
+          T3CODE_DESKTOP_WSL_RUNTIME: ${{ matrix.label == 'windows-x64' && format('wsl-runtime/t3-{0}-linux-x64.tar.gz', needs.linux-cli-archive.outputs.version) || '' }}
         run: corepack pnpm ${{ matrix.script }}
 
       - name: Upload installer
