@@ -39,6 +39,13 @@ jobs:
         with:
           toolchain: stable
 
+      # apps/server/scripts/cli.ts build-exe shells out to `vp pack`.
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1
+        with:
+          node-version-file: package.json
+          run-install: false
+
       - name: Install Linux desktop build libraries
         run: |
           sudo apt-get update
