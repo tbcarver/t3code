@@ -61,6 +61,10 @@ jobs:
         id: version
         run: echo "version=$(node -p "require('./apps/server/package.json').version")" >> "$GITHUB_OUTPUT"
 
+      # build-cli-archive.ts expects apps/server/dist/client to already exist.
+      - name: Build server and web client
+        run: vp run --filter t3 build
+
       # Needs a Node that supports --build-sea (25.7+); VP_NODE_VERSION tells
       # vp to download and use that Node for this step only, independent of
       # the repo's pinned engines.node.
