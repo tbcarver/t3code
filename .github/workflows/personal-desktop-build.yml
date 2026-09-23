@@ -61,9 +61,12 @@ jobs:
         id: version
         run: echo "version=$(node -p "require('./apps/server/package.json').version")" >> "$GITHUB_OUTPUT"
 
-      # Needs a Node that supports --build-sea (25.7+); the build tooling
-      # downloads that Node version itself, independent of the repo's Node.
+      # Needs a Node that supports --build-sea (25.7+); VP_NODE_VERSION tells
+      # vp to download and use that Node for this step only, independent of
+      # the repo's pinned engines.node.
       - name: Build CLI single-executable
+        env:
+          VP_NODE_VERSION: "26.8.2"
         run: node apps/server/scripts/cli.ts build-exe --verbose
 
       - name: Build CLI archive
