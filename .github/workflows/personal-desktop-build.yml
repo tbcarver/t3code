@@ -1,0 +1,73 @@
+name: Personal desktop build
+
+# Manual build of the Windows and Linux desktop installers for this fork.
+# Not the production release pipeline (see release-desktop.yml) — this is a
+# simplified build using the local branch as-is, without code signing or
+# relay tracing config, following docs/t3-code-windows-build.md and the
+# personal Linux build doc.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: windows-x64
+            os: windows-latest
+            script: dist:desktop:win:x64
+            rust_target: x86_64-pc-windows-msvc
+            artifact_glob: release/*.exe
+          - label: linux-x64
+            os: ubuntu-latest
+            script: dist:desktop:linux
+            rust_target: x86_64-unknown-linux-gnu
+            artifact_glob: release/*.AppImage
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: package.json
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install Linux desktop build libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-dev pkg-config imagemagick
+
+      - name: Copy public build config
+        shell: bash
+        run: cp .env.example .env
+
+      - name: Install dependencies
+        run: corepack pnpm install
+
+      - name: Build desktop installer
+        run: corepack pnpm ${{ matrix.script }}
+
+      - name: Upload installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa9 # v4
+        with:
+          name: t3code-${{ matrix.label }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
