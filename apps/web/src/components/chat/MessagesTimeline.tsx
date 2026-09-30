@@ -940,6 +940,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   );
   // Re-measure the minimap gutter when the chat column changes width without a viewport resize.
   const chatWidth = useClientSettings((settings) => settings.chatWidth);
+  const citeSelectionToolbarEnabled = useClientSettings(
+    (settings) => settings.citeSelectionToolbarEnabled,
+  );
   const {
     target: readyCitationRequest,
     positioning: citationPositioning,
@@ -1282,7 +1285,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           className="relative h-full min-h-0"
           data-assistant-citation-viewport="true"
         >
-          {onCiteAssistantText && citationThreadRef ? (
+          {citeSelectionToolbarEnabled && onCiteAssistantText && citationThreadRef ? (
             <AssistantSelectionToolbar
               viewport={timelineViewportElement}
               threadRef={citationThreadRef}
