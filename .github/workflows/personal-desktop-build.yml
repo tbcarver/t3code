@@ -15,6 +15,87 @@ permissions:
   contents: read
 
 jobs:
+  # Standalone Linux CLI archive for machines running just `t3` (no desktop
+  # app), such as WSL or a headless server. Not embedded into the Windows
+  # build — that only matters for the desktop app's own WSL backend, which
+  # isn't in use right now.
+  linux-cli-archive:
+    name: Build Linux CLI archive
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+
+      # apps/server/scripts/cli.ts build-exe shells out to `vp pack`.
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@250f29ce396baf5e8f24498e17c0dfdebabc26eb # v1
+        with:
+          node-version-file: package.json
+          run-install: false
+
+      - name: Install Linux desktop build libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-dev pkg-config imagemagick
+
+      - name: Copy public build config
+        run: cp .env.example .env
+
+      - name: Install dependencies
+        run: corepack pnpm install
+
+      - name: Resolve archive version
+        id: version
+        run: echo "version=$(node -p "require('./apps/server/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # build-cli-archive.ts expects apps/server/dist/client to already exist.
+      - name: Build server and web client
+        run: vp run --filter t3 build
+
+      # Needs a Node that supports --build-sea (25.7+); VP_NODE_VERSION tells
+      # vp to download and use that Node for this step only, independent of
+      # the repo's pinned engines.node.
+      - name: Build CLI single-executable
+        env:
+          VP_NODE_VERSION: "26.8.2"
+        run: node apps/server/scripts/cli.ts build-exe --verbose
+
+      - name: Build resource monitor
+        run: |
+          cargo build --release --manifest-path native/resource-monitor/Cargo.toml
+          mkdir -p "$RUNNER_TEMP/resource-monitor"
+          cp native/resource-monitor/target/release/t3-resource-monitor "$RUNNER_TEMP/resource-monitor/"
+
+      - name: Build CLI archive
+        run: |
+          node scripts/build-cli-archive.ts \
+            --platform linux \
+            --arch x64 \
+            --version "${{ steps.version.outputs.version }}" \
+            --resource-monitor-dir "$RUNNER_TEMP/resource-monitor" \
+            --output-dir release-cli
+
+      - name: Upload CLI archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cli-linux-x64
+          path: release-cli/*
+          if-no-files-found: error
+
   build:
     strategy:
       fail-fast: false
