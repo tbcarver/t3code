@@ -311,6 +311,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["notification toast popup completion input approval failure"],
   },
   {
+    id: "cite-selection-toolbar",
+    title: "Cite toolbar on text selection",
+    to: "/settings/general",
+    searchTerms: ["cite quote highlight select selection toolbar popup"],
+  },
+  {
     id: "time-format",
     title: "Time format",
     to: "/settings/general",

@@ -2365,6 +2365,17 @@ export function GeneralSettingsPanel() {
           }
         />
         <SettingsRow
+          {...searchableSetting("cite-selection-toolbar")}
+          description="Show a Cite button when you highlight text in an assistant message."
+          control={
+            <Switch
+              checked={settings.citeSelectionToolbarEnabled}
+              onCheckedChange={(checked) => updateSettings({ citeSelectionToolbarEnabled: checked })}
+              aria-label="Cite toolbar on text selection"
+            />
+          }
+        />
+        <SettingsRow
           {...searchableSetting("time-format")}
           description="System default follows your browser or OS clock preference."
           resetAction={
