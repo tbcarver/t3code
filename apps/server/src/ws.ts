@@ -82,6 +82,11 @@ import {
 } from "@t3tools/contracts";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import {
+  buildCustomWorktreeBranchName,
+  buildGeneratedWorktreeBranchName,
+  isTemporaryWorktreeBranch,
+} from "@t3tools/shared/git";
 import { HttpRouter, HttpServerRequest, HttpServerRespondable } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
@@ -121,6 +126,7 @@ import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as ServerSettings from "./serverSettings.ts";
+import * as TextGeneration from "./textGeneration/TextGeneration.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import { withTerminalOutputWindow } from "./terminal/OutputProtocol.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
@@ -575,6 +581,7 @@ const makeWsRpcLayer = (
       const config = yield* ServerConfig.ServerConfig;
       const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
       const serverSettings = yield* ServerSettings.ServerSettingsService;
+      const textGeneration = yield* TextGeneration.TextGeneration;
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
@@ -1053,6 +1060,15 @@ const makeWsRpcLayer = (
         readonly threadId: ThreadId;
         readonly projectId: ProjectId | null;
       }) {
+        return (yield* resolveBootstrapProjectSettings(input))?.worktreeSubmodules ?? null;
+      });
+
+      // The thread's effective settings (project override > environment), or null
+      // when settings fail to load.
+      const resolveBootstrapProjectSettings = Effect.fnUntraced(function* (input: {
+        readonly threadId: ThreadId;
+        readonly projectId: ProjectId | null;
+      }) {
         const settings = yield* serverSettings.getSettings.pipe(Effect.orElseSucceed(() => null));
         if (!settings) return null;
         // A worktree can also be prepared for an existing thread, whose
@@ -1070,8 +1086,54 @@ const makeWsRpcLayer = (
                 Effect.map(Option.getOrNull),
                 Effect.orElseSucceed(() => null),
               );
-        return resolveProjectSettings(settings, resolvedProjectId, project).settings
-          .worktreeSubmodules;
+        return resolveProjectSettings(settings, resolvedProjectId, project).settings;
+      });
+
+      // Names a new worktree branch from the first message before the worktree is
+      // created, so the branch and its folder carry the real name from the start.
+      // With branch naming instructions the name is used as written, without the
+      // t3code/ prefix. Null on any failure or an existing branch: the caller keeps
+      // the placeholder and the first-turn rename gets another try.
+      const generateBootstrapWorktreeBranch = Effect.fnUntraced(function* (input: {
+        readonly threadId: ThreadId;
+        readonly projectId: ProjectId | null;
+        readonly cwd: string;
+        readonly message: string;
+      }) {
+        return yield* Effect.gen(function* () {
+          const settings = yield* resolveBootstrapProjectSettings(input);
+          if (!settings || input.message.trim().length === 0) return null;
+          const instructions = settings.sourceControlWritingStyle.branchInstructions;
+          const modelSelection =
+            settings.sourceControlWriterModelSelection === null
+              ? settings.textGenerationModelSelection
+              : ServerSettings.resolveSourceControlWriterModelSelection(
+                  settings,
+                  yield* providerRegistry.getProviders,
+                );
+          const generated = yield* textGeneration.generateBranchName({
+            cwd: input.cwd,
+            message: input.message,
+            ...(instructions ? { instructions } : {}),
+            modelSelection,
+          });
+          const branch = instructions
+            ? buildCustomWorktreeBranchName(generated.branch)
+            : buildGeneratedWorktreeBranchName(generated.branch);
+          if (branch === null) return null;
+          const exists = yield* gitWorkflow.hasCommit({
+            cwd: input.cwd,
+            refName: `refs/heads/${branch}`,
+          });
+          return exists ? null : branch;
+        }).pipe(
+          Effect.timeout("30 seconds"),
+          Effect.catchCause((cause) =>
+            Effect.logWarning("failed to name worktree branch before creation", {
+              cause: Cause.pretty(cause),
+            }).pipe(Effect.as(null)),
+          ),
+        );
       });
 
       const dispatchBootstrapTurnStart = (
@@ -1496,6 +1558,17 @@ const makeWsRpcLayer = (
                 threadId,
                 projectId: targetProjectId ?? null,
               });
+              // Only a client placeholder is replaced; a branch the user named is kept.
+              const generatedBranch =
+                prepareWorktree.branch && isTemporaryWorktreeBranch(prepareWorktree.branch)
+                  ? yield* generateBootstrapWorktreeBranch({
+                      threadId,
+                      projectId: targetProjectId ?? null,
+                      cwd: prepareWorktree.projectCwd,
+                      message: command.message.text,
+                    })
+                  : null;
+              const worktreeBranch = generatedBranch ?? prepareWorktree.branch;
               // Claude threads put their worktree where Claude Code keeps its own,
               // <project>/.claude/worktrees/<branch>, instead of under the T3 home.
               // Worktree cleanup only sweeps the T3 home, so these are never auto-removed.
@@ -1512,14 +1585,14 @@ const makeWsRpcLayer = (
                       prepareWorktree.projectCwd,
                       ".claude",
                       "worktrees",
-                      (prepareWorktree.branch ?? worktreeBaseRef).replace(/\//g, "-"),
+                      (worktreeBranch ?? worktreeBaseRef).replace(/\//g, "-"),
                     )
                   : null;
               const worktree = yield* gitWorkflow.createWorktree(
                 {
                   cwd: prepareWorktree.projectCwd,
                   refName: worktreeBaseRef,
-                  newRefName: prepareWorktree.branch,
+                  newRefName: worktreeBranch,
                   baseRefName: prepareWorktree.baseBranch,
                   path: claudeWorktreePath,
                 },

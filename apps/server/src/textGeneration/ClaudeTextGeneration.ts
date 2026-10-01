@@ -372,6 +372,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
       const { prompt, outputSchema } = buildBranchNamePrompt({
         message: input.message,
         attachments: input.attachments,
+        instructions: input.instructions,
       });
 
       const generated = yield* runClaudeJson({

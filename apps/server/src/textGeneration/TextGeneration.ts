@@ -51,6 +51,8 @@ export interface BranchNameGenerationInput {
   cwd: string;
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
+  /** User naming rules; when set they replace the built-in branch naming rules. */
+  instructions?: string | undefined;
   /** What model and provider to use for generation. */
   modelSelection: ModelSelection;
 }

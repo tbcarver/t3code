@@ -82,6 +82,7 @@ export function SourceControlWritingSettingsSection() {
   const modeMixed = styleFieldMixed("mode");
   const instructionsMixed = styleFieldMixed("customInstructions");
   const templatesMixed = styleFieldMixed("followChangeRequestTemplates");
+  const branchInstructionsMixed = styleFieldMixed("branchInstructions");
   const writingStyleMixed = modeMixed || instructionsMixed;
   const mixedWriterModel = useScopedSettingsMixed(["sourceControlWriterModelSelection"]);
   const customInstructionsRef = useRef<HTMLTextAreaElement>(null);
@@ -241,6 +242,42 @@ export function SourceControlWritingSettingsSection() {
             />
           </div>
         ) : null}
+      </SettingsRow>
+
+      <SettingsRow
+        serverScoped
+        settingKeys={["sourceControlWritingStyle"]}
+        mixed={branchInstructionsMixed}
+        {...searchableSetting("branch-naming-instructions")}
+        description="Rules for naming new worktree branches and their folders, applied to your first message. When set, names are used exactly as generated, without the t3code/ prefix."
+        resetAction={
+          branchInstructionsMixed || style.branchInstructions !== defaults.branchInstructions ? (
+            <SettingResetButton
+              label="branch naming instructions"
+              onClick={() =>
+                updateSettings({
+                  sourceControlWritingStyle: { branchInstructions: defaults.branchInstructions },
+                })
+              }
+            />
+          ) : null
+        }
+      >
+        <div className="mt-3 max-w-2xl pb-3.5">
+          <Textarea
+            key={branchInstructionsMixed ? "mixed" : style.branchInstructions}
+            defaultValue={branchInstructionsMixed ? "" : style.branchInstructions}
+            onBlur={(event) => {
+              const branchInstructions = event.target.value.trim();
+              if (branchInstructionsMixed || branchInstructions !== style.branchInstructions) {
+                updateSettings({ sourceControlWritingStyle: { branchInstructions } });
+              }
+            }}
+            rows={4}
+            placeholder="Lowercase kebab-case: the lowercase Jira key, then a condensed summary of the work, e.g. lup-37-agent-pipeline."
+            aria-label="Branch naming instructions"
+          />
+        </div>
       </SettingsRow>
 
       <SettingsRow
