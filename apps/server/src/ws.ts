@@ -1496,13 +1496,32 @@ const makeWsRpcLayer = (
                 threadId,
                 projectId: targetProjectId ?? null,
               });
+              // Claude threads put their worktree where Claude Code keeps its own,
+              // <project>/.claude/worktrees/<branch>, instead of under the T3 home.
+              // Worktree cleanup only sweeps the T3 home, so these are never auto-removed.
+              const worktreeInstanceId =
+                bootstrap?.createThread?.modelSelection.instanceId ??
+                command.modelSelection?.instanceId;
+              const worktreeInstance = worktreeInstanceId
+                ? yield* providerInstances.getInstance(worktreeInstanceId)
+                : undefined;
+              const worktreePathService = yield* Path.Path;
+              const claudeWorktreePath =
+                worktreeInstance?.driverKind === "claudeAgent"
+                  ? worktreePathService.join(
+                      prepareWorktree.projectCwd,
+                      ".claude",
+                      "worktrees",
+                      (prepareWorktree.branch ?? worktreeBaseRef).replace(/\//g, "-"),
+                    )
+                  : null;
               const worktree = yield* gitWorkflow.createWorktree(
                 {
                   cwd: prepareWorktree.projectCwd,
                   refName: worktreeBaseRef,
                   newRefName: prepareWorktree.branch,
                   baseRefName: prepareWorktree.baseBranch,
-                  path: null,
+                  path: claudeWorktreePath,
                 },
                 {
                   submodules,
