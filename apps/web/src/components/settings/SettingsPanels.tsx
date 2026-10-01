@@ -2374,21 +2374,7 @@ export function GeneralSettingsPanel() {
               aria-label="Cite toolbar on text selection"
             />
           }
-        />
-        <SettingsRow
-          {...searchableSetting("pull-requests-system-browser")}
-          description="Clicking a pull request opens it in your system browser. Cmd/Ctrl+click opens it in the app instead."
-          control={
-            <Switch
-              checked={settings.pullRequestsOpenInSystemBrowser}
-              onCheckedChange={(checked) =>
-                updateSettings({ pullRequestsOpenInSystemBrowser: checked })
-              }
-              aria-label="Open pull requests in system browser"
-            />
-          }
-        />
-        <SettingsRow
+        />        <SettingsRow
           {...searchableSetting("time-format")}
           description="System default follows your browser or OS clock preference."
           resetAction={

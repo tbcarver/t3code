@@ -315,14 +315,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Cite toolbar on text selection",
     to: "/settings/general",
     searchTerms: ["cite quote highlight select selection toolbar popup"],
-  },
-  {
-    id: "pull-requests-system-browser",
-    title: "Open pull requests in system browser",
-    to: "/settings/general",
-    searchTerms: ["pr pull request link click external browser github panel"],
-  },
-  {
+  },  {
     id: "time-format",
     title: "Time format",
     to: "/settings/general",

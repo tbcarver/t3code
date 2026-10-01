@@ -302,11 +302,7 @@ export const ClientSettingsSchema = Schema.Struct({
   inAppNotificationsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   citeSelectionToolbarEnabled: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
-  ),
-  pullRequestsOpenInSystemBrowser: Schema.Boolean.pipe(
-    Schema.withDecodingDefault(Effect.succeed(false)),
-  ),
-  diffColorScheme: DiffColorScheme.pipe(
+  ),  diffColorScheme: DiffColorScheme.pipe(
     Schema.withDecodingDefault(Effect.succeed("red-green" as const)),
   ),
   chatWidth: ChatWidth.pipe(Schema.withDecodingDefault(Effect.succeed("comfortable" as const))),
@@ -1598,9 +1594,7 @@ export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;
 export const ClientSettingsPatch = Schema.Struct({
   notificationMode: Schema.optionalKey(NotificationMode),
   inAppNotificationsEnabled: Schema.optionalKey(Schema.Boolean),
-  citeSelectionToolbarEnabled: Schema.optionalKey(Schema.Boolean),
-  pullRequestsOpenInSystemBrowser: Schema.optionalKey(Schema.Boolean),
-  diffColorScheme: Schema.optionalKey(DiffColorScheme),
+  citeSelectionToolbarEnabled: Schema.optionalKey(Schema.Boolean),  diffColorScheme: Schema.optionalKey(DiffColorScheme),
   chatWidth: Schema.optionalKey(ChatWidth),
   loadBalancingEnabled: Schema.optionalKey(Schema.Boolean),
   loadBalancingWeights: Schema.optionalKey(LoadBalancingWeights),

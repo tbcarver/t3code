@@ -11,7 +11,6 @@ import {
 } from "@t3tools/shared/sourceControl";
 
 import { useOpenLink } from "../browser/useOpenLink";
-import { useClientSettings } from "../hooks/useSettings";
 import { readLocalApi } from "../localApi";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { useRightPanelStore } from "../rightPanelStore";
@@ -222,20 +221,14 @@ export function useOpenChangeRequestLink(
   const allProjects = useProjects();
   const serverConfigs = useServerConfigs();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
-  const preferSystemBrowser = useClientSettings(
-    (settings) => settings.pullRequestsOpenInSystemBrowser,
-  );
   return useCallback(
     (event, targetUrl, targetThreadRef, targetEnvironmentId) => {
-      const modified = shouldOpenPullRequestExternally(event);
-      // With the system-browser preference the modifier is inverted: a plain click opens the
-      // browser here, and cmd/ctrl+click falls through to the in-app panel below.
-      if (!preferSystemBrowser && modified) return false;
       const resolvedThreadRef = targetThreadRef ?? threadRef;
       const resolvedPanelRef = panelRef ?? resolvedThreadRef;
       const parsed = parseChangeRequestUrl(targetUrl);
       if (parsed === null) return false;
-      if (preferSystemBrowser && !modified) {
+      // A plain click opens the system browser; cmd/ctrl+click falls through to the in-app panel.
+      if (!shouldOpenPullRequestExternally(event)) {
         const api = readLocalApi();
         if (!api) return false;
         event.preventDefault();
@@ -338,7 +331,6 @@ export function useOpenChangeRequestLink(
       allProjects,
       navigate,
       panelRef,
-      preferSystemBrowser,
       primaryEnvironmentId,
       serverConfigs,
       threadRef,
@@ -349,29 +341,16 @@ export function useOpenChangeRequestLink(
 export function useOpenPrLink(threadRef?: ScopedThreadRef) {
   const openChangeRequest = useOpenChangeRequestLink(threadRef);
   const openLink = useOpenLink(threadRef);
-  const preferSystemBrowser = useClientSettings(
-    (settings) => settings.pullRequestsOpenInSystemBrowser,
-  );
   return useCallback(
     (event: MouseEvent<HTMLElement>, prUrl: string, targetThreadRef?: ScopedThreadRef) => {
       event.stopPropagation();
-      // The preference is applied inside openChangeRequest, which sees the raw modifiers.
-      const openInBrowser = !preferSystemBrowser && shouldOpenPullRequestExternally(event);
-      const isAnchor =
-        event.currentTarget instanceof HTMLAnchorElement && event.currentTarget.href.length > 0;
-      // A real link already knows how to cmd/ctrl+click. Leave its default
-      // action alone so the browser (or Electron's window-open handler) opens
-      // the host. Buttons have no href, so they still go through openExternal.
-      if (openInBrowser && isAnchor) return false;
-
       event.preventDefault();
-      if (!openInBrowser && openChangeRequest(event, prUrl, targetThreadRef)) return true;
+      // Plain click goes to the system browser, cmd/ctrl+click to the in-app panel.
+      if (openChangeRequest(event, prUrl, targetThreadRef)) return true;
 
-      // No project to show it in, so it is an ordinary link and follows the
-      // "Open links in" setting; the modifier still forces the system browser.
-      const forceSystemBrowser = preferSystemBrowser && !shouldOpenPullRequestExternally(event);
+      // No project to show it in: still prefer the system browser on a plain click.
       void openLink(prUrl, {
-        event: forceSystemBrowser ? { metaKey: true, ctrlKey: true } : event,
+        event: { metaKey: true, ctrlKey: true },
         threadRef: targetThreadRef,
       }).catch((error: unknown) => {
         console.error(error);
@@ -385,6 +364,6 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
       });
       return false;
     },
-    [openChangeRequest, openLink, preferSystemBrowser],
+    [openChangeRequest, openLink],
   );
 }
