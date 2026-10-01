@@ -303,6 +303,9 @@ export const ClientSettingsSchema = Schema.Struct({
   citeSelectionToolbarEnabled: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
+  pullRequestsOpenInSystemBrowser: Schema.Boolean.pipe(
+    Schema.withDecodingDefault(Effect.succeed(false)),
+  ),
   diffColorScheme: DiffColorScheme.pipe(
     Schema.withDecodingDefault(Effect.succeed("red-green" as const)),
   ),
@@ -1596,6 +1599,7 @@ export const ClientSettingsPatch = Schema.Struct({
   notificationMode: Schema.optionalKey(NotificationMode),
   inAppNotificationsEnabled: Schema.optionalKey(Schema.Boolean),
   citeSelectionToolbarEnabled: Schema.optionalKey(Schema.Boolean),
+  pullRequestsOpenInSystemBrowser: Schema.optionalKey(Schema.Boolean),
   diffColorScheme: Schema.optionalKey(DiffColorScheme),
   chatWidth: Schema.optionalKey(ChatWidth),
   loadBalancingEnabled: Schema.optionalKey(Schema.Boolean),
