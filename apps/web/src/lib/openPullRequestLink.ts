@@ -11,6 +11,7 @@ import {
 } from "@t3tools/shared/sourceControl";
 
 import { useOpenLink } from "../browser/useOpenLink";
+import { readLocalApi } from "../localApi";
 import { stackedThreadToast, toastManager } from "../components/ui/toast";
 import { useRightPanelStore } from "../rightPanelStore";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
@@ -222,11 +223,19 @@ export function useOpenChangeRequestLink(
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   return useCallback(
     (event, targetUrl, targetThreadRef, targetEnvironmentId) => {
-      if (shouldOpenPullRequestExternally(event)) return false;
       const resolvedThreadRef = targetThreadRef ?? threadRef;
       const resolvedPanelRef = panelRef ?? resolvedThreadRef;
       const parsed = parseChangeRequestUrl(targetUrl);
       if (parsed === null) return false;
+      // A plain click opens the system browser; cmd/ctrl+click falls through to the in-app panel.
+      if (!shouldOpenPullRequestExternally(event)) {
+        const api = readLocalApi();
+        if (!api) return false;
+        event.preventDefault();
+        event.stopPropagation();
+        void api.shell.openExternal(targetUrl).catch((error: unknown) => console.error(error));
+        return true;
+      }
       const reads = (environmentId: string) =>
         serverConfigs.get(environmentId as EnvironmentId)?.environment.capabilities.pullRequests ===
         true;
@@ -318,7 +327,14 @@ export function useOpenChangeRequestLink(
       });
       return true;
     },
-    [allProjects, navigate, panelRef, primaryEnvironmentId, serverConfigs, threadRef],
+    [
+      allProjects,
+      navigate,
+      panelRef,
+      primaryEnvironmentId,
+      serverConfigs,
+      threadRef,
+    ],
   );
 }
 
@@ -328,20 +344,15 @@ export function useOpenPrLink(threadRef?: ScopedThreadRef) {
   return useCallback(
     (event: MouseEvent<HTMLElement>, prUrl: string, targetThreadRef?: ScopedThreadRef) => {
       event.stopPropagation();
-      const openInBrowser = shouldOpenPullRequestExternally(event);
-      const isAnchor =
-        event.currentTarget instanceof HTMLAnchorElement && event.currentTarget.href.length > 0;
-      // A real link already knows how to cmd/ctrl+click. Leave its default
-      // action alone so the browser (or Electron's window-open handler) opens
-      // the host. Buttons have no href, so they still go through openExternal.
-      if (openInBrowser && isAnchor) return false;
-
       event.preventDefault();
-      if (!openInBrowser && openChangeRequest(event, prUrl, targetThreadRef)) return true;
+      // Plain click goes to the system browser, cmd/ctrl+click to the in-app panel.
+      if (openChangeRequest(event, prUrl, targetThreadRef)) return true;
 
-      // No project to show it in, so it is an ordinary link and follows the
-      // "Open links in" setting; the modifier still forces the system browser.
-      void openLink(prUrl, { event, threadRef: targetThreadRef }).catch((error: unknown) => {
+      // No project to show it in: still prefer the system browser on a plain click.
+      void openLink(prUrl, {
+        event: { metaKey: true, ctrlKey: true },
+        threadRef: targetThreadRef,
+      }).catch((error: unknown) => {
         console.error(error);
         toastManager.add(
           stackedThreadToast({
