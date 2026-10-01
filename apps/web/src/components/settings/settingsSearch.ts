@@ -718,6 +718,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     environmentOnly: true,
   },
   {
+    id: "branch-naming-instructions",
+    title: "Branch naming instructions",
+    to: "/settings/source-control",
+    searchTerms: ["worktree branch name naming folder jira key prefix t3code"],
+    environmentOnly: true,
+  },
+  {
     id: "follow-change-request-templates",
     title: "Follow change request templates",
     to: "/settings/source-control",

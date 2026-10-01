@@ -935,6 +935,8 @@ export const SourceControlWritingStyleSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed("repo_conventions" as const)),
   ),
   customInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  /** Rules for naming new worktree branches. Non-empty replaces the built-in naming rules. */
+  branchInstructions: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   followChangeRequestTemplates: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(true)),
   ),
@@ -1542,6 +1544,7 @@ export const ServerSettingsPatch = Schema.Struct({
     Schema.Struct({
       mode: Schema.optionalKey(SourceControlWritingStyleMode),
       customInstructions: Schema.optionalKey(TrimmedString),
+      branchInstructions: Schema.optionalKey(TrimmedString),
       followChangeRequestTemplates: Schema.optionalKey(Schema.Boolean),
     }),
   ),

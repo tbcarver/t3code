@@ -108,6 +108,50 @@ export function isTemporaryWorktreeBranch(refName: string): boolean {
   return TEMP_WORKTREE_BRANCH_PATTERN.test(refName.trim().toLowerCase());
 }
 
+/** A model-generated branch fragment as `t3code/<lowercase-kebab>`, the built-in naming rule. */
+export function buildGeneratedWorktreeBranchName(raw: string): string {
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/^refs\/heads\//, "")
+    .replace(/['"`]/g, "");
+
+  const withoutPrefix = normalized.startsWith(`${WORKTREE_BRANCH_PREFIX}/`)
+    ? normalized.slice(`${WORKTREE_BRANCH_PREFIX}/`.length)
+    : normalized;
+
+  const branchFragment = withoutPrefix
+    .replace(/[^a-z0-9/_-]+/g, "-")
+    .replace(/\/+/g, "/")
+    .replace(/-+/g, "-")
+    .replace(/^[./_-]+|[./_-]+$/g, "")
+    .slice(0, 64)
+    .replace(/[./_-]+$/g, "");
+
+  const safeFragment = branchFragment.length > 0 ? branchFragment : "update";
+  return `${WORKTREE_BRANCH_PREFIX}/${safeFragment}`;
+}
+
+/**
+ * A model-generated branch name that followed the user's own naming rules: kept as
+ * written (case included, no prefix added), only made into a valid ref. Null when
+ * nothing usable is left.
+ */
+export function buildCustomWorktreeBranchName(raw: string): string | null {
+  const name = raw
+    .trim()
+    .replace(/^refs\/heads\//, "")
+    .replace(/['"`]/g, "")
+    .replace(/[^A-Za-z0-9/_.-]+/g, "-")
+    .replace(/\/+/g, "/")
+    .replace(/-+/g, "-")
+    .replace(/\.{2,}/g, ".")
+    .replace(/^[./_-]+|[./_-]+$/g, "")
+    .slice(0, 100)
+    .replace(/(\.lock)?[./_-]*$/g, "");
+  return name.length > 0 ? name : null;
+}
+
 /**
  * The web spelling of an Azure DevOps repository reached over SSH, or null for anything else.
  *

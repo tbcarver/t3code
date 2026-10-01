@@ -147,6 +147,8 @@ export interface BranchNamePromptInput {
   message: string;
   attachments?: ReadonlyArray<ChatAttachment> | undefined;
   policy?: TextGenerationPolicy | undefined;
+  /** User naming rules; when set they replace the built-in rules below. */
+  instructions?: string | undefined;
 }
 
 interface PromptFromMessageInput {
@@ -185,18 +187,25 @@ function buildPromptFromMessage(input: PromptFromMessageInput): string {
 }
 
 export function buildBranchNamePrompt(input: BranchNamePromptInput) {
+  const instructions = input.instructions?.trim();
   const prompt = buildPromptFromMessage({
     instruction: "You generate concise git branch names.",
     responseShape: "Return a JSON object with key: branch.",
-    rules: [
-      "Branch should describe the requested work from the user message.",
-      "Keep it short and specific (2-6 words).",
-      "Use plain words only, no issue prefixes and no punctuation-heavy text.",
-      "If images are attached, use them as primary context for visual/UI issues.",
-    ],
+    rules: instructions
+      ? [
+          "Branch should describe the requested work from the user message.",
+          "Follow the naming instructions below exactly; they override any other convention.",
+          "Return only the branch name: no refs/heads/ prefix, no spaces, no quotes.",
+        ]
+      : [
+          "Branch should describe the requested work from the user message.",
+          "Keep it short and specific (2-6 words).",
+          "Use plain words only, no issue prefixes and no punctuation-heavy text.",
+          "If images are attached, use them as primary context for visual/UI issues.",
+        ],
     message: input.message,
     attachments: input.attachments,
-    additionalInstructions: input.policy?.branchInstructions,
+    additionalInstructions: instructions || input.policy?.branchInstructions,
   });
   const outputSchema = Schema.Struct({
     branch: Schema.String,
