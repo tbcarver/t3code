@@ -26,6 +26,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history so the version step can find the merged nightly tag.
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -57,6 +60,19 @@ jobs:
 
       - name: Install dependencies
         run: corepack pnpm install
+
+      # Stamps the merged nightly as the version, e.g. v0.0.45-nightly.20261002.2584
+      # becomes 0.0.45-tyler.20261002.2584, so the app and CLI show the real base.
+      # The fork has no upstream tags, so they are fetched from upstream first.
+      - name: Stamp custom version
+        shell: bash
+        run: |
+          git fetch --quiet --tags https://github.com/pingdotgg/t3code.git
+          tag="$(git describe --tags --abbrev=0 --match 'v*-nightly.*')"
+          version="${tag#v}"
+          version="${version/-nightly./-tyler.}"
+          echo "Building $version from $tag"
+          node scripts/update-release-package-versions.ts "$version"
 
       - name: Resolve archive version
         id: version
@@ -118,6 +134,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history so the version step can find the merged nightly tag.
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -145,6 +164,19 @@ jobs:
 
       - name: Install dependencies
         run: corepack pnpm install
+
+      # Stamps the merged nightly as the version, e.g. v0.0.45-nightly.20261002.2584
+      # becomes 0.0.45-tyler.20261002.2584, so the app and CLI show the real base.
+      # The fork has no upstream tags, so they are fetched from upstream first.
+      - name: Stamp custom version
+        shell: bash
+        run: |
+          git fetch --quiet --tags https://github.com/pingdotgg/t3code.git
+          tag="$(git describe --tags --abbrev=0 --match 'v*-nightly.*')"
+          version="${tag#v}"
+          version="${version/-nightly./-tyler.}"
+          echo "Building $version from $tag"
+          node scripts/update-release-package-versions.ts "$version"
 
       - name: Build desktop installer
         run: corepack pnpm ${{ matrix.script }}
