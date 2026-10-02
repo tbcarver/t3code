@@ -260,6 +260,8 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 // Fresh keys deliberately reset both shelves to collapsed for existing users.
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
+// Same key the old collapsible-sections patch used, so a saved choice carries over.
+const PINNED_SHELF_EXPANDED_KEY = "t3code:sidebar:pinned-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
 
 // Working beta: when this client saw each thread leave the Working shelf.
@@ -674,7 +676,7 @@ function SidebarDragBoundary(props: {
 
 // Shelf headers stay visible and keep their measured height while dragging.
 function SidebarSectionHeader(props: {
-  marker: "working-header" | "snoozed-header" | "settled-header";
+  marker: "pinned-header" | "working-header" | "snoozed-header" | "settled-header";
   label: string;
   className?: string;
   // While dragging, the settled header reads at full strength and takes the
@@ -684,11 +686,13 @@ function SidebarSectionHeader(props: {
   toggle: { expanded: boolean; onToggle: () => void };
 }) {
   const shelf =
-    props.marker === "working-header"
-      ? "working"
-      : props.marker === "snoozed-header"
-        ? "snoozed"
-        : "settled";
+    props.marker === "pinned-header"
+      ? "pinned"
+      : props.marker === "working-header"
+        ? "working"
+        : props.marker === "snoozed-header"
+          ? "snoozed"
+          : "settled";
   const snoozed = shelf === "snoozed";
   const className = cn(
     "flex h-full w-full items-center gap-2 px-2 text-left text-xs font-medium",
@@ -2850,6 +2854,27 @@ export default function Sidebar() {
     return routeThread === undefined ? EMPTY_THREADS : [routeThread];
   }, [routeThreadKey, settledShelfExpanded, visibleSettledThreads]);
 
+  // Pinned collapses like the shelves below it (expanded by default), with the
+  // same route exception so the open thread never vanishes behind the header.
+  const [pinnedShelfExpanded, setPinnedShelfExpanded] = useLocalStorage(
+    PINNED_SHELF_EXPANDED_KEY,
+    true,
+    Schema.Boolean,
+  );
+  const togglePinnedShelf = useCallback(
+    () => setPinnedShelfExpanded((value) => !value),
+    [setPinnedShelfExpanded],
+  );
+  const visiblePinnedThreads = useMemo(() => {
+    if (pinnedShelfExpanded) return pinnedThreads;
+    if (routeThreadKey === null) return EMPTY_THREADS;
+    const routeThread = pinnedThreads.find(
+      (thread) =>
+        scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)) === routeThreadKey,
+    );
+    return routeThread === undefined ? EMPTY_THREADS : [routeThread];
+  }, [pinnedShelfExpanded, pinnedThreads, routeThreadKey]);
+
   // The snoozed shelf is collapsed by default: out of the way, never gone.
   // Collapsed threads don't render (and so don't participate in jump
   // shortcuts or multi-select), matching the settled tail's paging model.
@@ -2900,14 +2925,14 @@ export default function Sidebar() {
 
   const orderedThreads = useMemo(
     () => [
-      ...pinnedThreads,
+      ...visiblePinnedThreads,
       ...activeThreads,
       ...visibleWorkingThreads,
       ...visibleSnoozedThreads,
       ...renderedSettledThreads,
     ],
     [
-      pinnedThreads,
+      visiblePinnedThreads,
       activeThreads,
       visibleWorkingThreads,
       visibleSnoozedThreads,
@@ -3514,7 +3539,7 @@ export default function Sidebar() {
       return [];
     }
     const items: SidebarListItem[] = [{ kind: "marker", marker: "pinned-header" }];
-    const pinnedRows = rowsOf(pinnedThreads, "pinned");
+    const pinnedRows = rowsOf(visiblePinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
     const activeRows = rowsOf(activeThreads, "active");
@@ -3539,6 +3564,7 @@ export default function Sidebar() {
     renderedSettledThreads,
     settledThreads.length,
     snoozedThreads.length,
+    visiblePinnedThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
     workingThreads.length,
@@ -4989,6 +5015,26 @@ export default function Sidebar() {
                         }
                         switch (item.marker) {
                           case "pinned-header":
+                            // Outside a drag, Pinned gets a real collapsible header;
+                            // while dragging it stays the drop boundary upstream draws.
+                            if (from === null && pinnedThreads.length > 0) {
+                              items.push(
+                                <SidebarSectionHeader
+                                  key="pinned-shelf-header"
+                                  marker="pinned-header"
+                                  label={
+                                    pinnedShelfExpanded
+                                      ? "Pinned"
+                                      : `Pinned (${pinnedThreads.length})`
+                                  }
+                                  toggle={{
+                                    expanded: pinnedShelfExpanded,
+                                    onToggle: togglePinnedShelf,
+                                  }}
+                                />,
+                              );
+                              break;
+                            }
                             items.push(
                               <SidebarDragBoundary
                                 key="pinned-header"
