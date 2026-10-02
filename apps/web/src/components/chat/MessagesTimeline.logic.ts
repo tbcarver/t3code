@@ -1010,9 +1010,11 @@ export function deriveMessagesTimelineRows(input: {
     latestTurn: input.latestTurn ?? null,
     unfoldedTurnIds: activeVisualResponseTurnIds,
   });
+  // Folds start open: `expandedTurnIds` holds the turns the user toggled, which
+  // here means the ones they collapsed by clicking "Worked for ...".
   const collapsedEntryIds = new Set<string>();
   for (const fold of foldsByAnchorEntryId.values()) {
-    if (!input.expandedTurnIds?.has(fold.turnId)) {
+    if (input.expandedTurnIds?.has(fold.turnId)) {
       for (const entryId of fold.hiddenEntryIds) {
         collapsedEntryIds.add(entryId);
       }
@@ -1148,7 +1150,7 @@ export function deriveMessagesTimelineRows(input: {
         createdAt: anchoredTurnFold.createdAt,
         turnId: anchoredTurnFold.turnId,
         label: anchoredTurnFold.label,
-        expanded: input.expandedTurnIds?.has(anchoredTurnFold.turnId) ?? false,
+        expanded: !(input.expandedTurnIds?.has(anchoredTurnFold.turnId) ?? false),
       });
     }
 
