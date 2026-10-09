@@ -1,9 +1,7 @@
-import type { ConnectionCatalogEntry } from "@t3tools/client-runtime/connection";
 import type { ServerConfig } from "@t3tools/contracts";
 import { useMemo } from "react";
 
 import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
-import { isDesktopLocalConnectionTarget } from "~/connection/desktopLocal";
 import {
   buildLocalEnvironmentUpdateGroups,
   deriveEnvironmentDisplayLabel,
@@ -11,16 +9,6 @@ import {
   type LocalEnvironmentProvidersInput,
   type LocalEnvironmentUpdateGroup,
 } from "./ProviderUpdateLaunchNotification.logic";
-
-/**
- * A local environment is either the same-origin primary backend or a
- * desktop-local secondary (the parallel WSL backend), which connects over
- * loopback with a bearer token and carries a `local:<backendInstanceId>`
- * connection id. SSH, relay, and other remote targets are excluded.
- */
-function isLocalConnectionTarget(target: ConnectionCatalogEntry["target"]): boolean {
-  return target._tag === "PrimaryConnectionTarget" || isDesktopLocalConnectionTarget(target);
-}
 
 function normalizeConnectionState(phase: string | undefined): EnvironmentUpdateConnectionState {
   switch (phase) {
@@ -43,10 +31,11 @@ function normalizeConnectionState(phase: string | undefined): EnvironmentUpdateC
 }
 
 /**
- * Reactively enumerate the enabled local environments (the primary plus any
- * desktop-local secondary such as WSL) with each one's full provider list and a
- * flag for whether any is still connecting. Drives the launch popover's gating
- * and its per-environment update triggers.
+ * Reactively enumerate every connected environment (the primary, a desktop-local
+ * secondary such as WSL, and remote servers over T3 Connect, SSH or a saved URL)
+ * with each one's full provider list and a flag for whether any is still
+ * connecting. Drives the launch popover's gating and its per-environment update
+ * triggers. Remote servers are included because their providers go stale too.
  */
 export function useLocalEnvironmentUpdateGroups(): {
   readonly groups: LocalEnvironmentUpdateGroup[];
@@ -59,10 +48,6 @@ export function useLocalEnvironmentUpdateGroups(): {
     const inputs: LocalEnvironmentProvidersInput[] = [];
 
     for (const environment of environments) {
-      if (!isLocalConnectionTarget(environment.entry.target)) {
-        continue;
-      }
-
       const isPrimary = environment.environmentId === primaryEnvironmentId;
       const serverConfig: ServerConfig | null = environment.serverConfig;
 
