@@ -4,6 +4,7 @@ import {
   collectLimitAccounts,
   collectLimitPools,
   formatDuration,
+  type LimitAccount,
   type LimitPool,
   type LimitPoolWindow,
 } from "@t3tools/shared/usageLimits";
@@ -12,6 +13,7 @@ import { memo, useCallback, useEffect, useMemo } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNowMinute } from "../../hooks/useNowMinute";
+import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useServerConfigs, useThreadShell } from "../../state/entities";
 import { environmentPresentations } from "../../state/presentation";
 import { resolveThreadRouteTarget } from "../../threadRoutes";
@@ -23,31 +25,63 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 const WARNING_AT_PERCENT = 20;
 const ERROR_AT_PERCENT = 5;
 
-type Driver = ServerProvider["driver"];
+/** Which subscription account a provider instance is signed in to. */
+interface AccountIdentity {
+  readonly driver: ServerProvider["driver"];
+  readonly email: string | undefined;
+  readonly credentialFingerprint: string | undefined;
+}
 
 // The chip unmounts on the Settings and Usage pages, where the footer shows only Back.
-// Module scope keeps the last open thread's provider across them, so coming back to a
-// route without a thread (home) still shows the provider being worked with.
-let lastOpenDriver: Driver | undefined;
+// Module scope keeps the last open thread's account across them, so coming back to a
+// route without a thread (home) still shows the account being worked with.
+let lastOpenIdentity: AccountIdentity | undefined;
 
-/** The driver of a provider instance, looking in the thread's own environment first. */
-function driverOf(
+function normalizedEmail(email: string | undefined): string | undefined {
+  return email?.trim().toLowerCase() || undefined;
+}
+
+/** The provider instance, looking in the thread's own environment first. */
+function providerOf(
   configs: ReturnType<typeof useServerConfigs>,
   instanceId: ProviderInstanceId,
   environmentId: EnvironmentId | null,
-): Driver | undefined {
+): ServerProvider | undefined {
   const own =
     environmentId === null
       ? undefined
       : configs
           .get(environmentId)
           ?.providers.find((provider) => provider.instanceId === instanceId);
-  if (own) return own.driver;
+  if (own) return own;
   for (const config of configs.values()) {
     const found = config.providers.find((provider) => provider.instanceId === instanceId);
-    if (found) return found.driver;
+    if (found) return found;
   }
   return undefined;
+}
+
+function identityOf(provider: ServerProvider): AccountIdentity {
+  return {
+    driver: provider.driver,
+    email: normalizedEmail(provider.auth.email),
+    credentialFingerprint: provider.usageLimits?.credentialFingerprint,
+  };
+}
+
+/** The email names the account; a credential fingerprint stands in when none is reported. */
+function accountFor(
+  accounts: readonly LimitAccount[],
+  identity: AccountIdentity,
+): LimitAccount | undefined {
+  return accounts.find(
+    (account) =>
+      account.driver === identity.driver &&
+      (identity.email !== undefined
+        ? normalizedEmail(account.email) === identity.email
+        : identity.credentialFingerprint !== undefined &&
+          account.limits.credentialFingerprint === identity.credentialFingerprint),
+  );
 }
 
 /** The session window when the provider has one, else whichever window has the least left. */
@@ -62,10 +96,11 @@ function chipWindow(pool: LimitPool): LimitPoolWindow | null {
 }
 
 /**
- * The session quota left for the provider of the thread that is open, in the free space of
- * the sidebar footer row. The thread only picks the provider: the number is the Usage
- * page's own, merged across every connected environment from its freshest reads, so it
- * never differs from that page or jumps as you move between threads on different servers.
+ * The session quota left for the account the open thread runs on, in the free space of
+ * the sidebar footer row. The thread picks the account: its provider instance's signed-in
+ * email, matched to the Usage page's merged accounts, so the number is that one account's
+ * own reading (the Usage page's, from the freshest read of it across every environment)
+ * and never an average over accounts the thread does not use.
  * Reads data the app already has; repaints at most once a minute on the shared clock.
  */
 export const SidebarUsageChip = memo(function SidebarUsageChip() {
@@ -86,21 +121,23 @@ export const SidebarUsageChip = memo(function SidebarUsageChip() {
     draftId === null ? null : (store.getDraftSession(draftId)?.environmentId ?? null),
   );
   const serverConfigs = useServerConfigs();
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
   const presentations = useAtomValue(environmentPresentations.presentationsAtom);
   const now = Date.parse(`${useNowMinute()}:00.000Z`);
 
   const threadEnvironmentId = thread?.environmentId ?? null;
   const threadInstanceId =
     thread?.session?.providerInstanceId ?? thread?.modelSelection.instanceId ?? null;
-  const driver = useMemo(() => {
-    if (threadRef !== null) {
-      return threadInstanceId === null
-        ? undefined
-        : driverOf(serverConfigs, threadInstanceId, threadEnvironmentId);
-    }
-    return draftProvider === null
-      ? undefined
-      : driverOf(serverConfigs, draftProvider, draftEnvironmentId);
+  const identity = useMemo(() => {
+    const provider =
+      threadRef !== null
+        ? threadInstanceId === null
+          ? undefined
+          : providerOf(serverConfigs, threadInstanceId, threadEnvironmentId)
+        : draftProvider === null
+          ? undefined
+          : providerOf(serverConfigs, draftProvider, draftEnvironmentId);
+    return provider ? identityOf(provider) : undefined;
   }, [
     draftEnvironmentId,
     draftProvider,
@@ -110,30 +147,33 @@ export const SidebarUsageChip = memo(function SidebarUsageChip() {
     threadRef,
   ]);
   useEffect(() => {
-    if (driver !== undefined) lastOpenDriver = driver;
-  }, [driver]);
+    if (identity !== undefined) lastOpenIdentity = identity;
+  }, [identity]);
 
-  const pools = useMemo(
-    () => collectLimitPools(collectLimitAccounts(presentations), now),
-    [presentations, now],
-  );
+  const accounts = useMemo(() => collectLimitAccounts(presentations), [presentations]);
   const openUsage = useCallback(() => {
     if (isMobile) setOpenMobile(false);
     void navigate({ to: "/usage" });
   }, [isMobile, navigate, setOpenMobile]);
 
-  // With a thread open, only its own provider counts: another provider's number would
-  // read as this thread's. Without one, use the last open thread's provider, then the
-  // first provider that reports a quota.
-  const wantedDriver = threadRef !== null ? driver : (driver ?? lastOpenDriver);
-  const pool =
-    threadRef !== null && wantedDriver === undefined
+  // With a thread open, only its own account counts: another account's number would read
+  // as this thread's. Without one, use the last open thread's account, then the first
+  // account signed in on this machine.
+  const wantedIdentity = threadRef !== null ? identity : (identity ?? lastOpenIdentity);
+  const account =
+    threadRef !== null && wantedIdentity === undefined
       ? undefined
-      : wantedDriver === undefined
-        ? pools[0]
-        : pools.find((candidate) => candidate.driver === wantedDriver);
+      : wantedIdentity === undefined
+        ? accounts.find((candidate) =>
+            candidate.environments.some((entry) => entry.environmentId === primaryEnvironmentId),
+          )
+        : accountFor(accounts, wantedIdentity);
+  const pool = useMemo(
+    () => (account ? collectLimitPools([account], now)[0] : undefined),
+    [account, now],
+  );
   const window = pool ? chipWindow(pool) : null;
-  if (pool === undefined || window === null) return null;
+  if (account === undefined || pool === undefined || window === null) return null;
 
   const remaining = window.remainingPercent;
   const label = getDriverOption(pool.driver)?.label ?? String(pool.driver);
@@ -171,7 +211,9 @@ export const SidebarUsageChip = memo(function SidebarUsageChip() {
         />
         <TooltipPopup side="top">
           <div className="flex flex-col gap-0.5">
-            <span className="font-medium">{label}</span>
+            <span className="font-medium">
+              {account.email ? `${label} · ${account.email}` : label}
+            </span>
             {pool.windows.map((entry) => {
               const resetAt = entry.resets[0]?.at;
               return (
