@@ -211,7 +211,7 @@ export function useOpenChangeRequestLink(
 ): (
   event: Pick<
     MouseEvent<HTMLElement>,
-    "preventDefault" | "stopPropagation" | "metaKey" | "ctrlKey"
+    "preventDefault" | "stopPropagation" | "metaKey" | "ctrlKey" | "altKey"
   >,
   targetUrl: string,
   targetThreadRef?: ScopedThreadRef,
@@ -227,13 +227,19 @@ export function useOpenChangeRequestLink(
       const resolvedPanelRef = panelRef ?? resolvedThreadRef;
       const parsed = parseChangeRequestUrl(targetUrl);
       if (parsed === null) return false;
-      // A plain click opens the system browser; cmd/ctrl+click falls through to the in-app panel.
-      if (!shouldOpenPullRequestExternally(event)) {
+      // A plain click opens the system browser; cmd/ctrl+click opens it without bringing the
+      // browser forward; alt+click falls through to the in-app panel.
+      if (!event.altKey) {
         const api = readLocalApi();
         if (!api) return false;
         event.preventDefault();
         event.stopPropagation();
-        void api.shell.openExternal(targetUrl).catch((error: unknown) => console.error(error));
+        void api.shell
+          .openExternal(
+            targetUrl,
+            shouldOpenPullRequestExternally(event) ? { background: true } : undefined,
+          )
+          .catch((error: unknown) => console.error(error));
         return true;
       }
       const reads = (environmentId: string) =>

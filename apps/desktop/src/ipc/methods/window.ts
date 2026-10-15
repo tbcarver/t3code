@@ -19,6 +19,7 @@ import * as HostProcess from "@t3tools/shared/hostProcess";
 import * as NodeOS from "node:os";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -303,11 +304,24 @@ export const showContextMenu = DesktopIpc.makeIpcMethod({
 
 export const openExternal = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.OPEN_EXTERNAL_CHANNEL,
-  payload: Schema.String,
+  payload: Schema.Union([
+    Schema.String,
+    Schema.Struct({ url: Schema.String, background: Schema.Boolean }),
+  ]),
   result: Schema.Boolean,
-  handler: Effect.fn("desktop.ipc.window.openExternal")(function* (url) {
+  handler: Effect.fn("desktop.ipc.window.openExternal")(function* (payload) {
     const shell = yield* ElectronShell.ElectronShell;
-    return yield* shell.openExternal(url);
+    if (typeof payload === "string") return yield* shell.openExternal(payload);
+    // A background open: macOS is told not to activate the browser. Windows and Linux have no
+    // such option, so the window that was focused takes focus back once the browser has had its
+    // moment (best effort; a compositor may refuse).
+    const owner = Electron.BrowserWindow.getFocusedWindow();
+    const opened = yield* shell.openExternal(payload.url, { activate: false });
+    if (opened && owner !== null) {
+      yield* Effect.sleep(Duration.millis(250));
+      if (!owner.isDestroyed() && !owner.isFocused()) owner.focus();
+    }
+    return opened;
   }),
 });
 

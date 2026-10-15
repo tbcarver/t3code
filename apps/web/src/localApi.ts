@@ -18,9 +18,9 @@ function createBrowserLocalApi(): LocalApi {
       },
     },
     shell: {
-      openExternal: async (url) => {
+      openExternal: async (url, options) => {
         if (window.desktopBridge) {
-          const opened = await window.desktopBridge.openExternal(url);
+          const opened = await window.desktopBridge.openExternal(url, options);
           if (!opened) {
             throw new Error("Unable to open link.");
           }

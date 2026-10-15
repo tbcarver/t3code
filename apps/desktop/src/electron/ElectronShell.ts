@@ -53,7 +53,11 @@ export function parseSafeExternalUrl(rawUrl: unknown): Option.Option<string> {
 export class ElectronShell extends Context.Service<
   ElectronShell,
   {
-    readonly openExternal: (rawUrl: unknown) => Effect.Effect<boolean>;
+    /** `activate: false` keeps the opened app in the background (macOS only). */
+    readonly openExternal: (
+      rawUrl: unknown,
+      options?: { readonly activate?: boolean },
+    ) => Effect.Effect<boolean>;
     /** Opens a known System Settings pane by identifier, not by URL. */
     readonly openSystemSettings: (pane: SystemSettingsPane) => Effect.Effect<boolean>;
     readonly copyText: (text: string) => Effect.Effect<void>;
@@ -62,12 +66,12 @@ export class ElectronShell extends Context.Service<
 
 /** @public Service construction is part of the canonical Effect module API. */
 export const make = ElectronShell.of({
-  openExternal: (rawUrl) =>
+  openExternal: (rawUrl, options) =>
     Option.match(parseSafeExternalUrl(rawUrl), {
       onNone: () => Effect.succeed(false),
       onSome: (externalUrl) =>
         Effect.promise(() =>
-          Electron.shell.openExternal(externalUrl).then(
+          Electron.shell.openExternal(externalUrl, options).then(
             () => true,
             () => false,
           ),

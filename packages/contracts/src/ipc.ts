@@ -1215,7 +1215,8 @@ export interface DesktopBridge {
   /** Receives a local OAuth code for a sign-in owned by a remote environment. */
   receiveProviderAuthCallback?: (authorizationUrl: string) => Promise<string>;
   cancelProviderAuthCallback?: (authorizationUrl: string) => Promise<void>;
-  openExternal: (url: string) => Promise<boolean>;
+  /** `background` asks the OS not to bring the opened app forward; best effort off macOS. */
+  openExternal: (url: string, options?: { readonly background?: boolean }) => Promise<boolean>;
   /**
    * Open a System Settings pane by identifier. Optional: older desktop builds
    * lack it, and callers no-op when it is missing.
@@ -1373,7 +1374,7 @@ export interface LocalApi {
     confirm: (message: string, options?: ConfirmDialogOptions) => Promise<boolean>;
   };
   shell: {
-    openExternal: (url: string) => Promise<void>;
+    openExternal: (url: string, options?: { readonly background?: boolean }) => Promise<void>;
     /** Opens a known System Settings pane; no-ops outside the desktop app. */
     openSystemSettings: (pane: SystemSettingsPane) => Promise<void>;
   };
