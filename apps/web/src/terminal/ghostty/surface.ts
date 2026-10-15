@@ -392,7 +392,9 @@ export function isTerminalPasteShortcut(
     return event.shiftKey && !event.ctrlKey && !event.metaKey;
   }
   if (key !== "v") return false;
-  return isMacPlatform(platform) ? event.metaKey : event.ctrlKey && event.shiftKey;
+  // Ctrl+V pastes too, as in Windows Terminal; Ctrl+Shift+V keeps working. A program
+  // that wants a literal Ctrl+V (vim block mode) no longer receives it.
+  return isMacPlatform(platform) ? event.metaKey : event.ctrlKey && !event.metaKey;
 }
 
 /**
