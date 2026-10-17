@@ -1,4 +1,4 @@
-import * as nodePath from "node:path";
+import * as Path from "effect/Path";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -206,6 +206,7 @@ const make = Effect.gen(function* () {
   const git = yield* GitWorkflow.GitWorkflowService;
   const setupScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
   const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
+  const pathService = yield* Path.Path;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const textGeneration = yield* TextGeneration.TextGeneration;
   const receipts = yield* CommandReceiptStore.CommandReceiptStoreV2;
@@ -445,7 +446,7 @@ const make = Effect.gen(function* () {
         const claudeWorktreePath =
           providers.find((provider) => provider.instanceId === input.providerInstanceId)
             ?.driver === "claudeAgent"
-            ? nodePath.join(project.workspaceRoot, ".claude", "worktrees", branch!.replaceAll("/", "-"))
+            ? pathService.join(project.workspaceRoot, ".claude", "worktrees", branch!.replaceAll("/", "-"))
             : null;
         const worktree = yield* git
           .createWorktree(
