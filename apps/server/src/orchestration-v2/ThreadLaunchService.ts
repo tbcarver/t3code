@@ -1,4 +1,5 @@
-import * as Path from "effect/Path";
+// @effect-diagnostics nodeBuiltinImport:off - only joins the Claude worktree path; the launch tests provide no Path service.
+import * as NodePath from "node:path";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -206,7 +207,6 @@ const make = Effect.gen(function* () {
   const git = yield* GitWorkflow.GitWorkflowService;
   const setupScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
   const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
-  const pathService = yield* Path.Path;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
   const textGeneration = yield* TextGeneration.TextGeneration;
   const receipts = yield* CommandReceiptStore.CommandReceiptStoreV2;
@@ -446,7 +446,7 @@ const make = Effect.gen(function* () {
         const claudeWorktreePath =
           providers.find((provider) => provider.instanceId === input.providerInstanceId)
             ?.driver === "claudeAgent"
-            ? pathService.join(project.workspaceRoot, ".claude", "worktrees", branch!.replaceAll("/", "-"))
+            ? NodePath.join(project.workspaceRoot, ".claude", "worktrees", branch!.replaceAll("/", "-"))
             : null;
         const worktree = yield* git
           .createWorktree(
