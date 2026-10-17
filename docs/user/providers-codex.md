@@ -25,15 +25,6 @@ T3 Code can use your installed Codex and its existing login. Run `codex login`
 on the environment's machine to sign in. [Provider setup](./install.md#providers)
 covers installation and custom configuration.
 
-## Use Daybreak
-
-When the signed-in account and selected model both have Daybreak access, choose
-**On** under **Daybreak** in the model options. If the model offers both programs,
-choose **Red** or **Blue** instead. The control is in
-the composer on web and desktop, and in thread settings on mobile. Choose
-**Off** to return to standard access. If you choose a model without the
-selected Daybreak program, T3 Code asks before switching and resetting Daybreak.
-
 ## Use multiple accounts
 
 Add another ChatGPT account in **Settings → Providers**, then select the account

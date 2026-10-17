@@ -8,7 +8,6 @@ export type AssistantTextSelector = {
   readonly suffix: string;
 };
 
-/** Live DOM state for an open comment, never part of a saved citation. */
 export type AssistantCitationSourceAnchor = {
   source: HTMLElement;
   range: Range;
@@ -48,7 +47,6 @@ function splitsSurrogatePair(text: string, offset: number): boolean {
   return before >= 0xd800 && before <= 0xdbff && after >= 0xdc00 && after <= 0xdfff;
 }
 
-/** Keeps the exact captured text while storing normalized UTF-16 positions and context. */
 export function createAssistantTextSelector(
   text: string,
   rawStart: number,
@@ -59,7 +57,6 @@ export function createAssistantTextSelector(
 
   const normalized = normalizeWhitespace(text);
   let start = normalizeWhitespace(text.slice(0, rawStart)).length;
-  // A selection starting inside a whitespace run includes its normalized space.
   if (rawStart > 0 && /\s/.test(text[rawStart - 1]!) && /\s/.test(text[rawStart]!)) {
     start -= 1;
   }
@@ -79,12 +76,9 @@ export function createAssistantTextSelector(
 }
 
 /**
- * Matches case-sensitive text after collapsing each JS whitespace run to one
- * space, without trimming. All positions and context lengths use UTF-16 units
- * in that normalized stream, not markdown offsets or Unicode code points.
- * `selector.text` can retain the original line breaks and code indentation.
- * Repeated quotes require one match for all supplied context. Even matching
- * saved offsets cannot break a context tie, since those offsets may have drifted.
+ * All positions and context lengths use UTF-16 units in that normalized stream,
+ * not markdown offsets or Unicode code points. Even matching saved offsets cannot
+ * break a context tie, since those offsets may have drifted.
  */
 export function findAssistantCitationText(
   text: string,
@@ -185,8 +179,13 @@ function isUsableRange(root: HTMLElement, range: Range): boolean {
   ) {
     return false;
   }
-  // Interior controls are allowed; readAssistantText omits them from the stream.
   return true;
+}
+
+function isUnselectable(text: Text): boolean {
+  const element = text.parentElement;
+  const view = element?.ownerDocument?.defaultView;
+  return !!element && !!view && view.getComputedStyle(element).userSelect === "none";
 }
 
 function selectedTextBoundary(range: Range, node: Node, last: boolean): Text | null {
@@ -195,7 +194,9 @@ function selectedTextBoundary(range: Range, node: Node, last: boolean): Text | n
     const text = node as Text;
     const start = node === range.startContainer ? range.startOffset : 0;
     const end = node === range.endContainer ? range.endOffset : text.length;
-    return start < end ? text : null;
+    // Triple-click ranges run through unselectable rows (tool calls, timestamps,
+    // author headings) into the next response; that text is not selected.
+    return start < end && !isUnselectable(text) ? text : null;
   }
   for (
     let child = last ? node.lastChild : node.firstChild;
@@ -208,7 +209,6 @@ function selectedTextBoundary(range: Range, node: Node, last: boolean): Text | n
   return null;
 }
 
-/** Captures the ordered native range, including selections dragged backwards. */
 export function captureAssistantTextSelection(
   viewport: HTMLElement,
   selection: Selection | null,
@@ -259,7 +259,6 @@ function rawTextOffset(text: string, normalizedOffset: number): number {
   return text.length;
 }
 
-/** Resolves against the current DOM without changing the user's selection. */
 export function resolveAssistantCitationRange(
   root: HTMLElement,
   selector: AssistantTextSelector,

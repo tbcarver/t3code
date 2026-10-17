@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ProviderInstanceId, type ModelCapabilities } from "@t3tools/contracts";
+import { ProviderDriverKind, ProviderInstanceId, type ModelCapabilities } from "@t3tools/contracts";
 
 import {
   applyClaudePromptEffortPrefix,
   buildExplicitProviderOptionSelectionsFromDescriptors,
   buildProviderOptionSelectionsFromDescriptors,
-  carryCodexCyberAccessProgram,
   createModelCapabilities,
   createModelSelection,
+  formatCodexModelName,
+  formatModelSlugName,
+  getProviderOptionCurrentLabel,
   getModelSelectionBooleanOptionValue,
   getModelSelectionStringOptionValue,
   getProviderOptionDescriptors,
@@ -15,7 +17,29 @@ import {
   toCustomModelSetting,
   getProviderOptionBooleanSelectionValue,
   getProviderOptionStringSelectionValue,
+  normalizeCustomModelSlug,
+  normalizeModelSlug,
+  modelSelectionsEqual,
 } from "./model.ts";
+
+it("keeps the Codex catalog display formatting", () => {
+  expect(formatCodexModelName("gpt-5.3-codex-spark")).toBe("GPT-5.3-Codex-Spark");
+  expect(formatCodexModelName("GPT Test")).toBe("GPT Test");
+});
+
+it.each([
+  ["gpt-5.4", "GPT-5.4"],
+  ["claude-opus-4-6", "Claude Opus 4.6"],
+  ["claude-sonnet-4-20250514", "Claude Sonnet 4 20250514"],
+  ["claude-opus-4-6[1m]", "Claude Opus 4.6[1m]"],
+  ["openai/gpt-5.4-mini", "openai/GPT-5.4-Mini"],
+  ["gemini-2.5-pro-preview-06-05", "Gemini 2.5 Pro Preview 06 05"],
+  ["custom/model-v2", "custom/model-v2"],
+  ["gpt-proxy", "gpt-proxy"],
+  ["My Custom Model", "My Custom Model"],
+])("formats a known model ID without losing its qualifiers: %s", (slug, expected) => {
+  expect(formatModelSlugName(slug)).toBe(expected);
+});
 
 const codexCaps: ModelCapabilities = createModelCapabilities({
   optionDescriptors: [
@@ -37,143 +61,12 @@ const codexCaps: ModelCapabilities = createModelCapabilities({
   ],
 });
 
-const daybreakCaps = createModelCapabilities({
-  optionDescriptors: [
-    {
-      id: "cyberAccessProgram",
-      label: "Daybreak",
-      type: "select",
-      options: [
-        { id: "standard", label: "Off", isDefault: true },
-        { id: "daybreakBlue", label: "Blue" },
-      ],
-    },
-  ],
-});
+describe("model slug normalization", () => {
+  it("preserves exact custom slugs instead of expanding provider aliases", () => {
+    const claude = ProviderDriverKind.make("claudeAgent");
 
-describe("Daybreak model switching", () => {
-  const instanceId = ProviderInstanceId.make("codex");
-  const selected = createModelSelection(instanceId, "gpt-6-sol", [
-    { id: "cyberAccessProgram", value: "daybreakBlue" },
-  ]);
-
-  it("keeps an active choice when the next model advertises it", () => {
-    expect(
-      carryCodexCyberAccessProgram({
-        current: selected,
-        next: createModelSelection(instanceId, "gpt-6-luna"),
-        nextCapabilities: daybreakCaps,
-      }),
-    ).toEqual({
-      selection: createModelSelection(instanceId, "gpt-6-luna", [
-        { id: "cyberAccessProgram", value: "daybreakBlue" },
-      ]),
-      didReset: false,
-    });
-  });
-
-  it("carries a supported program to another Codex instance without warning", () => {
-    const workInstanceId = ProviderInstanceId.make("codex_work");
-    expect(
-      carryCodexCyberAccessProgram({
-        current: selected,
-        next: createModelSelection(workInstanceId, "gpt-6-sol"),
-        nextCapabilities: daybreakCaps,
-      }),
-    ).toEqual({
-      selection: createModelSelection(workInstanceId, "gpt-6-sol", [
-        { id: "cyberAccessProgram", value: "daybreakBlue" },
-      ]),
-      didReset: false,
-    });
-  });
-
-  it("warns and clears Daybreak when the next model has no advertised standard program", () => {
-    const switched = carryCodexCyberAccessProgram({
-      current: selected,
-      next: createModelSelection(instanceId, "gpt-6-astra", [
-        { id: "reasoningEffort", value: "high" },
-      ]),
-      nextCapabilities: codexCaps,
-    });
-    expect(switched).toEqual({
-      selection: createModelSelection(instanceId, "gpt-6-astra", [
-        { id: "reasoningEffort", value: "high" },
-      ]),
-      didReset: true,
-    });
-    expect(
-      carryCodexCyberAccessProgram({
-        current: switched.selection,
-        next: createModelSelection(instanceId, "gpt-6-sol"),
-        nextCapabilities: daybreakCaps,
-      }).selection.options,
-    ).toBeUndefined();
-  });
-
-  it("clears a previous Off choice when the next catalog does not advertise standard", () => {
-    expect(
-      carryCodexCyberAccessProgram({
-        current: createModelSelection(instanceId, "gpt-6-sol", [
-          { id: "cyberAccessProgram", value: "standard" },
-        ]),
-        next: createModelSelection(instanceId, "unlisted-model", [
-          { id: "cyberAccessProgram", value: "standard" },
-        ]),
-        nextCapabilities: null,
-      }),
-    ).toEqual({
-      selection: { instanceId, model: "unlisted-model", options: [] },
-      didReset: false,
-    });
-  });
-
-  it("resets Red when the next model only offers Blue", () => {
-    expect(
-      carryCodexCyberAccessProgram({
-        current: createModelSelection(instanceId, "gpt-red", [
-          { id: "cyberAccessProgram", value: "daybreakRed" },
-        ]),
-        next: createModelSelection(instanceId, "gpt-blue"),
-        nextCapabilities: daybreakCaps,
-      }),
-    ).toEqual({
-      selection: createModelSelection(instanceId, "gpt-blue", [
-        { id: "cyberAccessProgram", value: "standard" },
-      ]),
-      didReset: true,
-    });
-  });
-
-  it("drops a saved program that the next model does not advertise", () => {
-    const staleNext = createModelSelection(instanceId, "gpt-6-astra", [
-      { id: "reasoningEffort", value: "high" },
-      { id: "cyberAccessProgram", value: "daybreakBlue" },
-    ]);
-    expect(
-      carryCodexCyberAccessProgram({
-        current: createModelSelection(instanceId, "gpt-6-astra"),
-        next: staleNext,
-        nextCapabilities: codexCaps,
-      }),
-    ).toEqual({
-      selection: createModelSelection(instanceId, "gpt-6-astra", [
-        { id: "reasoningEffort", value: "high" },
-      ]),
-      didReset: false,
-    });
-    expect(
-      carryCodexCyberAccessProgram({
-        current: selected,
-        next: { ...staleNext, instanceId: ProviderInstanceId.make("codex_work") },
-        nextCapabilities: codexCaps,
-      }),
-    ).toEqual({
-      selection: createModelSelection(ProviderInstanceId.make("codex_work"), "gpt-6-astra", [
-        { id: "reasoningEffort", value: "high" },
-      ]),
-      didReset: true,
-    });
+    expect(normalizeModelSlug("opus", claude)).toBe("opus");
+    expect(normalizeCustomModelSlug(" opus ")).toBe("opus");
   });
 });
 
@@ -304,6 +197,29 @@ describe("descriptor helpers", () => {
     expect(getModelSelectionStringOptionValue(selection, "reasoningEffort")).toBe("high");
     expect(getModelSelectionBooleanOptionValue(selection, "fastMode")).toBe(true);
   });
+
+  it("compares complete model selections independent of option ordering", () => {
+    const left = createModelSelection(ProviderInstanceId.make("codex"), "gpt-5.4", [
+      { id: "reasoningEffort", value: "high" },
+      { id: "fastMode", value: true },
+    ]);
+    const reordered = createModelSelection(ProviderInstanceId.make("codex"), "gpt-5.4", [
+      { id: "fastMode", value: true },
+      { id: "reasoningEffort", value: "high" },
+    ]);
+
+    expect(modelSelectionsEqual(left, reordered)).toBe(true);
+    expect(
+      modelSelectionsEqual(left, {
+        ...reordered,
+        options: [
+          { id: "fastMode", value: true },
+          { id: "reasoningEffort", value: "medium" },
+        ],
+      }),
+    ).toBe(false);
+    expect(modelSelectionsEqual(left, { ...reordered, model: "gpt-5.5" })).toBe(false);
+  });
 });
 
 describe("applyClaudePromptEffortPrefix", () => {
@@ -383,5 +299,65 @@ describe("readCustomModelEntries", () => {
       name: "X",
       capabilities,
     });
+  });
+});
+
+describe("provider-reported option display", () => {
+  const selection = createModelSelection(ProviderInstanceId.make("opencode"), "ling");
+  const reported = { ...selection, options: [{ id: "variant", value: "default" }] };
+  const descriptor = {
+    id: "variant",
+    label: "Reasoning",
+    type: "select" as const,
+    options: [
+      { id: "none", label: "None" },
+      { id: "thinking", label: "Thinking" },
+    ],
+  };
+
+  it("shows explicit reports without adding a choice or a dispatch option", () => {
+    expect(getProviderOptionCurrentLabel(descriptor, selection, reported)).toBe("Default");
+    expect(
+      getProviderOptionCurrentLabel(descriptor, selection, {
+        ...reported,
+        options: [{ id: "variant", value: "thinking" }],
+      }),
+    ).toBe("Thinking");
+    expect(
+      getProviderOptionCurrentLabel(
+        { ...descriptor, currentValue: "none" },
+        { ...selection, options: [{ id: "variant", value: "none" }] },
+        reported,
+      ),
+    ).toBe("None");
+    expect(descriptor.options.map((option) => option.id)).toEqual(["none", "thinking"]);
+    expect(buildProviderOptionSelectionsFromDescriptors([descriptor])).toBeUndefined();
+    expect(getProviderOptionCurrentLabel(descriptor, selection)).toBe("Unknown");
+    const effortDescriptor = { ...descriptor, id: "effort", currentValue: "default" };
+    expect(getProviderOptionCurrentLabel(effortDescriptor, selection)).toBeUndefined();
+    expect(
+      getProviderOptionCurrentLabel(effortDescriptor, selection, {
+        ...reported,
+        model: "other",
+        options: [{ id: "effort", value: "default" }],
+      }),
+    ).toBeUndefined();
+    expect(
+      getProviderOptionCurrentLabel(effortDescriptor, selection, {
+        ...reported,
+        options: [{ id: "effort", value: "default" }],
+      }),
+    ).toBe("Default");
+    expect(
+      getProviderOptionCurrentLabel({ ...descriptor, currentValue: "thinking" }, selection),
+    ).toBe("Unknown");
+  });
+
+  it.each([
+    { ...selection, model: "other" },
+    { ...selection, instanceId: ProviderInstanceId.make("other") },
+    { ...selection, options: [{ id: "variant", value: "none" }] },
+  ])("ignores reports after changing the model, instance, or option: %j", (selected) => {
+    expect(getProviderOptionCurrentLabel(descriptor, selected, reported)).toBe("Unknown");
   });
 });
