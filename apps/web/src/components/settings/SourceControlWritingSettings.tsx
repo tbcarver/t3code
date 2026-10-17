@@ -86,7 +86,6 @@ export function SourceControlWritingSettingsSection() {
   const modeMixed = styleFieldMixed("mode");
   const instructionsMixed = styleFieldMixed("customInstructions");
   const templatesMixed = styleFieldMixed("followChangeRequestTemplates");
-  const branchInstructionsMixed = styleFieldMixed("branchInstructions");
   const writingStyleMixed = modeMixed || instructionsMixed;
   const mixedWriterModel = useScopedSettingsMixed(["sourceControlWriterModelSelection"]);
   const mixedReviewGuideModel = useScopedSettingsMixed(["reviewGuideModelSelection"]);
@@ -96,7 +95,6 @@ export function SourceControlWritingSettingsSection() {
   const customInstructionsRef = useRef<HTMLTextAreaElement>(null);
   const [editingAllInstructions, setEditingAllInstructions] = useState(false);
   const [allInstructions, setAllInstructions] = useState<string | null>(null);
-  const [allBranchInstructions, setAllBranchInstructions] = useState<string | null>(null);
   const style = settings.sourceControlWritingStyle;
   const defaults = DEFAULT_UNIFIED_SETTINGS.sourceControlWritingStyle;
   const isSourceControlWritingStyleDirty =
@@ -292,87 +290,6 @@ export function SourceControlWritingSettingsSection() {
             />
           </div>
         ) : null}
-      </SettingsRow>
-
-      <SettingsRow
-        serverScoped
-        settingKeys={["sourceControlWritingStyle"]}
-        mixed={branchInstructionsMixed}
-        {...searchableSetting("branch-naming-instructions")}
-        description="Rules for naming new worktree branches and their folders, applied to your first message. When set, names are used exactly as generated, without the t3code/ prefix."
-        resetAction={
-          branchInstructionsMixed || style.branchInstructions !== defaults.branchInstructions ? (
-            <SettingResetButton
-              label="branch naming instructions"
-              onClick={() =>
-                updateSettings({
-                  sourceControlWritingStyle: { branchInstructions: defaults.branchInstructions },
-                })
-              }
-            />
-          ) : null
-        }
-      >
-        {branchInstructionsMixed ? (
-          // Environments disagree: never write on blur, only on an explicit apply,
-          // so tabbing through a blank box cannot wipe every environment's rules.
-          <div className="mt-3 max-w-2xl space-y-2 pb-3.5">
-            {allBranchInstructions !== null ? (
-              <>
-                <Textarea
-                  value={allBranchInstructions}
-                  onChange={(event) => setAllBranchInstructions(event.target.value)}
-                  rows={4}
-                  aria-label="Branch naming instructions for all selected environments"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    updateSettings({
-                      sourceControlWritingStyle: {
-                        branchInstructions: allBranchInstructions.trim(),
-                      },
-                    });
-                    setAllBranchInstructions(null);
-                  }}
-                >
-                  Apply to all selected environments
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() =>
-                  setAllBranchInstructions(
-                    targets
-                      .map((target) => target.settings.sourceControlWritingStyle.branchInstructions)
-                      .find((value) => value !== undefined && value.length > 0) ?? "",
-                  )
-                }
-              >
-                Differs between environments — edit for all
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="mt-3 max-w-2xl pb-3.5">
-            <Textarea
-              key={style.branchInstructions}
-              defaultValue={style.branchInstructions}
-              onBlur={(event) => {
-                const branchInstructions = event.target.value.trim();
-                if (branchInstructions !== style.branchInstructions) {
-                  updateSettings({ sourceControlWritingStyle: { branchInstructions } });
-                }
-              }}
-              rows={4}
-              placeholder="Lowercase kebab-case: the lowercase Jira key, then a condensed summary of the work, e.g. lup-37-agent-pipeline."
-              aria-label="Branch naming instructions"
-            />
-          </div>
-        )}
       </SettingsRow>
 
       <SettingsRow

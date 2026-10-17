@@ -1,3 +1,4 @@
+import * as nodePath from "node:path";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -10,6 +11,7 @@ import {
   type OrchestrationV2Actor,
   type OrchestrationV2CreationSource,
   type OrchestrationV2ProviderThreadNativeMetadata,
+  type ProviderInstanceId,
   type OrchestrationV2ThreadProjection,
   type ProviderDriverKind,
   type ProviderInteractionMode,
@@ -102,6 +104,8 @@ type PreparationInput = Pick<
   "commandId" | "projectId" | "workspaceStrategy" | "initialMessage"
 > & {
   readonly reusedWorktree?: { readonly baseRef: string };
+  /** The provider instance the thread runs on; Claude threads get their worktree under .claude. */
+  readonly providerInstanceId?: ProviderInstanceId | undefined;
 };
 
 export interface ThreadLaunchPreparationInput {
@@ -434,6 +438,15 @@ const make = Effect.gen(function* () {
           branch = flattenTemporaryWorktreeBranchName(branch);
         }
         yield* setupTracker.stageStatus(threadId, "checkout", "running");
+        // Claude threads put their worktree where Claude Code keeps its own,
+        // <project>/.claude/worktrees/<branch>, instead of under the T3 home. Worktree
+        // cleanup only sweeps the T3 home, so these are never auto-removed.
+        const providers = yield* providerRegistry.getProviders;
+        const claudeWorktreePath =
+          providers.find((provider) => provider.instanceId === input.providerInstanceId)
+            ?.driver === "claudeAgent"
+            ? nodePath.join(project.workspaceRoot, ".claude", "worktrees", branch!.replaceAll("/", "-"))
+            : null;
         const worktree = yield* git
           .createWorktree(
             {
@@ -441,7 +454,7 @@ const make = Effect.gen(function* () {
               refName: startRef,
               newRefName: branch!,
               baseRefName: input.workspaceStrategy.baseRef,
-              path: null,
+              path: claudeWorktreePath,
             },
             {
               progress: {
@@ -1017,7 +1030,11 @@ const make = Effect.gen(function* () {
                     );
               if (preparationStillRequired) {
                 yield* schedulePreparation(
-                  { ...input, workspaceStrategy: preparationStrategy },
+                  {
+                    ...input,
+                    workspaceStrategy: preparationStrategy,
+                    providerInstanceId: input.modelSelection.instanceId,
+                  },
                   threadId,
                   runId,
                 );
@@ -1093,6 +1110,7 @@ const make = Effect.gen(function* () {
         commandId: input.commandId,
         projectId: projection.thread.projectId,
         workspaceStrategy: reuse?.strategy ?? workspacePreparation,
+        providerInstanceId: projection.thread.modelSelection.instanceId,
         ...(reuse === null ? {} : { reusedWorktree: reuse.reusedWorktree }),
         ...(message === undefined
           ? {}
