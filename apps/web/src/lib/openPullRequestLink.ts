@@ -112,10 +112,8 @@ export function useOpenChangeRequestLink(
   threadRef?: ScopedThreadRef,
   panelRef?: ScopedThreadRef,
 ): (
-  event: Pick<
-    MouseEvent<HTMLElement>,
-    "preventDefault" | "stopPropagation" | "metaKey" | "ctrlKey" | "altKey"
-  >,
+  event: Pick<MouseEvent<HTMLElement>, "preventDefault" | "stopPropagation" | "metaKey" | "ctrlKey"> &
+    Partial<Pick<MouseEvent<HTMLElement>, "altKey">>,
   targetUrl: string,
   targetThreadRef?: ScopedThreadRef,
   targetEnvironmentId?: EnvironmentId,

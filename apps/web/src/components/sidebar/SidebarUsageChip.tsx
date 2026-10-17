@@ -18,7 +18,7 @@ import { useServerConfigs, useThreadShell } from "../../state/entities";
 import { environmentPresentations } from "../../state/presentation";
 import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
-import { getDriverOption } from "../settings/providerDriverMeta";
+import { providerClients } from "../settings/providerDriverMeta";
 import { SidebarMenuButton, SidebarMenuItem, useSidebar } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
@@ -126,8 +126,7 @@ export const SidebarUsageChip = memo(function SidebarUsageChip() {
   const now = Date.parse(`${useNowMinute()}:00.000Z`);
 
   const threadEnvironmentId = thread?.environmentId ?? null;
-  const threadInstanceId =
-    thread?.session?.providerInstanceId ?? thread?.modelSelection.instanceId ?? null;
+  const threadInstanceId = thread?.providerInstanceId ?? thread?.modelSelection.instanceId ?? null;
   const identity = useMemo(() => {
     const provider =
       threadRef !== null
@@ -176,7 +175,7 @@ export const SidebarUsageChip = memo(function SidebarUsageChip() {
   if (account === undefined || pool === undefined || window === null) return null;
 
   const remaining = window.remainingPercent;
-  const label = getDriverOption(pool.driver)?.label ?? String(pool.driver);
+  const label = providerClients.get(pool.driver)?.label ?? String(pool.driver);
 
   return (
     <SidebarMenuItem className="shrink-0">
