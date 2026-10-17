@@ -9,18 +9,49 @@ name: Personal desktop build
 # host machine.
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "build = installers and CLI archive, check = typecheck and web tests, both = all"
+        type: choice
+        options: [build, check, both]
+        default: build
 
 permissions:
   contents: read
 
 jobs:
+  # Typecheck and web tests, since a local checkout cannot run them here (the EDR
+  # blocks install). Reports problems that the packaging builds do not catch.
+  typecheck:
+    name: Typecheck and web tests
+    if: ${{ inputs.mode == 'check' || inputs.mode == 'both' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Vite+
+        uses: ./.github/actions/setup-ci-deps
+
+      - name: Ensure Electron runtime is installed
+        run: vp run --filter @t3tools/desktop ensure:electron
+
+      - name: Typecheck
+        run: vpr typecheck
+
+      - name: Web tests
+        if: ${{ !cancelled() }}
+        run: vp run --filter @t3tools/web test
+
   # Standalone Linux CLI archive for machines running just `t3` (no desktop
   # app), such as WSL or a headless server. Not embedded into the Windows
   # build — that only matters for the desktop app's own WSL backend, which
   # isn't in use right now.
   linux-cli-archive:
     name: Build Linux CLI archive
+    if: ${{ inputs.mode != 'check' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -129,6 +160,7 @@ jobs:
             rust_target: x86_64-unknown-linux-gnu
             artifact_glob: release/*.AppImage
     name: Build ${{ matrix.label }}
+    if: ${{ inputs.mode != 'check' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
