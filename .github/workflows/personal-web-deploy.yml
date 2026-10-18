@@ -29,6 +29,10 @@ jobs:
       - name: Setup Vite+
         uses: ./.github/actions/setup-ci-deps
 
+      # Public sign-in and relay config (T3 Connect), same as the desktop build.
+      - name: Copy public build config
+        run: cp .env.example .env
+
       - name: Build web app
         env:
           VITE_HOSTED_APP_URL: ${{ vars.WEB_URL }}
