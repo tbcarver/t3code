@@ -17,10 +17,13 @@ Parameters:
   BasicAuthPassword:
     Type: String
     NoEcho: true
-  GitHubRepo:
+  GitHubSubjectPrefix:
     Type: String
-    Default: tbcarver/t3code
-    Description: owner/name of the repository allowed to deploy.
+    Default: repo:tbcarver@86443400/t3code@1383669697
+    Description: >-
+      OIDC subject prefix of the repository allowed to deploy. This repo uses immutable
+      subjects, so it carries the owner and repo IDs; read it with
+      gh api repos/OWNER/REPO/actions/oidc/customization/sub.
   CreateOidcProvider:
     Type: String
     Default: "true"
@@ -194,7 +197,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubRepo}:ref:refs/heads/*"
+                token.actions.githubusercontent.com:sub: !Sub "${GitHubSubjectPrefix}:ref:refs/heads/*"
       Policies:
         - PolicyName: deploy-web
           PolicyDocument:
