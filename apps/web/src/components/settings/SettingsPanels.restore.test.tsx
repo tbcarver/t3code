@@ -66,7 +66,7 @@ describe("restoring V2 settings", () => {
     ["autoResumeLimitedThreads", "Auto-resume limited threads"],
     ["snoozeLimitedThreads", "Snooze limited threads"],
   ] as const)("restores %s when it is the only changed setting", async (key, label) => {
-    state.settings = { ...DEFAULT_UNIFIED_SETTINGS, [key]: true };
+    state.settings = { ...DEFAULT_UNIFIED_SETTINGS, [key]: !DEFAULT_UNIFIED_SETTINGS[key] };
     hooks.beginRender();
     const restore = useSettingsRestore();
 

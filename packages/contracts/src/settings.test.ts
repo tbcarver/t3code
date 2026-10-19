@@ -399,11 +399,11 @@ describe("ClientSettings load balancing", () => {
 });
 
 describe("ClientSettings composer context strip", () => {
-  it("defaults to draft-only and accepts a persistent strip preference", () => {
-    expect(decodeClientSettings({}).persistComposerContextStrip).toBe(false);
+  it("defaults to a persistent strip and accepts a draft-only preference", () => {
+    expect(decodeClientSettings({}).persistComposerContextStrip).toBe(true);
     expect(
-      decodeClientSettingsPatch({ persistComposerContextStrip: true }).persistComposerContextStrip,
-    ).toBe(true);
+      decodeClientSettingsPatch({ persistComposerContextStrip: false }).persistComposerContextStrip,
+    ).toBe(false);
   });
 });
 
