@@ -367,8 +367,8 @@ describe("ClientSettings diff colors", () => {
 });
 
 describe("ClientSettings chat width", () => {
-  it("keeps the comfortable width for existing settings without a saved width", () => {
-    expect(decodeClientSettings({}).chatWidth).toBe("comfortable");
+  it("defaults to the wide width for settings without a saved width", () => {
+    expect(decodeClientSettings({}).chatWidth).toBe("wide");
   });
 
   it.each(["comfortable", "wide", "full"])("round-trips the %s width", (chatWidth) => {
