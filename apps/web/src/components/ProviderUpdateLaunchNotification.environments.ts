@@ -1,7 +1,8 @@
-import type { ServerConfig } from "@t3tools/contracts";
-import { useMemo } from "react";
-
-import { useEnvironments, usePrimaryEnvironmentId } from "~/state/environments";
+import {
+  useEnvironmentProviders,
+  useEnvironments,
+  usePrimaryEnvironmentId,
+} from "~/state/environments";
 import {
   buildLocalEnvironmentUpdateGroups,
   deriveEnvironmentDisplayLabel,
@@ -28,46 +29,41 @@ function normalizeConnectionState(phase: string | undefined): EnvironmentUpdateC
 }
 
 /**
- * Reactively enumerate every connected environment (the primary, a desktop-local
- * secondary such as WSL, and remote servers over T3 Connect, SSH or a saved URL)
- * with each one's full provider list and a flag for whether any is still
- * connecting. Drives the launch popover's gating and its per-environment update
- * triggers. Remote servers are included because their providers go stale too.
+ * Every connected environment, not only the primary and desktop-local ones: remote
+ * servers over T3 Connect, SSH or a saved URL are included because their providers
+ * go stale too.
  */
 export function useLocalEnvironmentUpdateGroups(): {
   readonly groups: LocalEnvironmentUpdateGroup[];
   readonly isAnySettling: boolean;
 } {
   const { environments } = useEnvironments();
+  const providersByEnvironment = useEnvironmentProviders();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
 
-  return useMemo(() => {
-    const inputs: LocalEnvironmentProvidersInput[] = [];
+  const inputs: LocalEnvironmentProvidersInput[] = [];
 
-    for (const environment of environments) {
-      const isPrimary = environment.environmentId === primaryEnvironmentId;
-      const serverConfig: ServerConfig | null = environment.serverConfig;
+  for (const environment of environments) {
+    const isPrimary = environment.environmentId === primaryEnvironmentId;
+    const serverConfig = environment.serverConfig;
 
-      inputs.push({
-        environmentId: environment.environmentId,
-        label: isPrimary
-          ? deriveEnvironmentDisplayLabel({
-              isWsl: false,
-              wslDistro: null,
-              platformOs: serverConfig?.environment.platform.os,
-              fallbackLabel: environment.label,
-            })
-          : environment.label,
-        isPrimary,
-        connectionState: isPrimary
-          ? "ready"
-          : normalizeConnectionState(environment.connection.phase),
-        providers: serverConfig?.providers ?? [],
-      });
-    }
+    inputs.push({
+      environmentId: environment.environmentId,
+      label: isPrimary
+        ? deriveEnvironmentDisplayLabel({
+            isWsl: false,
+            wslDistro: null,
+            platformOs: serverConfig?.environment.platform.os,
+            fallbackLabel: environment.label,
+          })
+        : environment.label,
+      isPrimary,
+      connectionState: isPrimary ? "ready" : normalizeConnectionState(environment.connection.phase),
+      providers: providersByEnvironment.get(environment.environmentId) ?? [],
+    });
+  }
 
-    inputs.sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
+  inputs.sort((left, right) => Number(right.isPrimary) - Number(left.isPrimary));
 
-    return buildLocalEnvironmentUpdateGroups(inputs);
-  }, [environments, primaryEnvironmentId]);
+  return buildLocalEnvironmentUpdateGroups(inputs);
 }
