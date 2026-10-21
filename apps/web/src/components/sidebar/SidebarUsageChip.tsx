@@ -13,8 +13,8 @@ import { memo, useCallback, useEffect, useMemo } from "react";
 
 import { useComposerDraftStore } from "../../composerDraftStore";
 import { useNowMinute } from "../../hooks/useNowMinute";
-import { usePrimaryEnvironmentId } from "../../state/environments";
-import { useServerConfigs, useThreadShell } from "../../state/entities";
+import { useEnvironmentProviders, usePrimaryEnvironmentId } from "../../state/environments";
+import { useThreadShell } from "../../state/entities";
 import { environmentPresentations } from "../../state/presentation";
 import { resolveThreadRouteTarget } from "../../threadRoutes";
 import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
@@ -43,19 +43,19 @@ function normalizedEmail(email: string | undefined): string | undefined {
 
 /** The provider instance, looking in the thread's own environment first. */
 function providerOf(
-  configs: ReturnType<typeof useServerConfigs>,
+  providersByEnvironment: ReturnType<typeof useEnvironmentProviders>,
   instanceId: ProviderInstanceId,
   environmentId: EnvironmentId | null,
 ): ServerProvider | undefined {
   const own =
     environmentId === null
       ? undefined
-      : configs
+      : providersByEnvironment
           .get(environmentId)
-          ?.providers.find((provider) => provider.instanceId === instanceId);
+          ?.find((provider) => provider.instanceId === instanceId);
   if (own) return own;
-  for (const config of configs.values()) {
-    const found = config.providers.find((provider) => provider.instanceId === instanceId);
+  for (const providers of providersByEnvironment.values()) {
+    const found = providers.find((provider) => provider.instanceId === instanceId);
     if (found) return found;
   }
   return undefined;
@@ -120,9 +120,9 @@ export const SidebarUsageChip = memo(function SidebarUsageChip() {
   const draftEnvironmentId = useComposerDraftStore((store) =>
     draftId === null ? null : (store.getDraftSession(draftId)?.environmentId ?? null),
   );
-  const serverConfigs = useServerConfigs();
+  const providersByEnvironment = useEnvironmentProviders();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
-  const presentations = useAtomValue(environmentPresentations.presentationsAtom);
+  const presentations = useAtomValue(environmentPresentations.presentationsWithProvidersAtom);
   const now = Date.parse(`${useNowMinute()}:00.000Z`);
 
   const threadEnvironmentId = thread?.environmentId ?? null;
@@ -132,15 +132,15 @@ export const SidebarUsageChip = memo(function SidebarUsageChip() {
       threadRef !== null
         ? threadInstanceId === null
           ? undefined
-          : providerOf(serverConfigs, threadInstanceId, threadEnvironmentId)
+          : providerOf(providersByEnvironment, threadInstanceId, threadEnvironmentId)
         : draftProvider === null
           ? undefined
-          : providerOf(serverConfigs, draftProvider, draftEnvironmentId);
+          : providerOf(providersByEnvironment, draftProvider, draftEnvironmentId);
     return provider ? identityOf(provider) : undefined;
   }, [
     draftEnvironmentId,
     draftProvider,
-    serverConfigs,
+    providersByEnvironment,
     threadEnvironmentId,
     threadInstanceId,
     threadRef,
