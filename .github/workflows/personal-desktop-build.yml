@@ -12,9 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "build = installers and CLI archive, check = typecheck and web tests, both = all"
+        description: "build = installers and CLI archive, cli = CLI archive only, check = typecheck and web tests, both = all"
         type: choice
-        options: [build, check, both]
+        options: [build, cli, check, both]
         default: build
 
 permissions:
@@ -118,7 +118,7 @@ jobs:
       # the repo's pinned engines.node.
       - name: Build CLI single-executable
         env:
-          VP_NODE_VERSION: "26.8.2"
+          VP_NODE_VERSION: "26.12.1"
         run: node apps/server/scripts/cli.ts build-exe --verbose
 
       - name: Build resource monitor
@@ -160,7 +160,7 @@ jobs:
             rust_target: x86_64-unknown-linux-gnu
             artifact_glob: release/*.AppImage
     name: Build ${{ matrix.label }}
-    if: ${{ inputs.mode != 'check' }}
+    if: ${{ inputs.mode != 'check' && inputs.mode != 'cli' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
