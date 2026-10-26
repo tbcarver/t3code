@@ -3113,11 +3113,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 <SidebarSectionHeader
                                   key="pinned-shelf-header"
                                   marker="pinned-header"
-                                  label={
-                                    pinnedShelfExpanded
-                                      ? "Pinned"
-                                      : `Pinned (${pinnedThreads.length})`
-                                  }
+                                  label="Pinned"
+                                  count={pinnedThreads.length}
                                   toggle={{
                                     expanded: pinnedShelfExpanded,
                                     onToggle: togglePinnedShelf,
