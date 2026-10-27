@@ -143,6 +143,7 @@ jobs:
           name: cli-linux-x64
           path: release-cli/*
           if-no-files-found: error
+          retention-days: 3
 
   build:
     strategy:
@@ -219,3 +220,4 @@ jobs:
           name: t3code-${{ matrix.label }}
           path: ${{ matrix.artifact_glob }}
           if-no-files-found: error
+          retention-days: 3
