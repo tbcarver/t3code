@@ -219,16 +219,17 @@ export const layer: Layer.Layer<
     ];
     // Read-state events preserve updatedAt and supersede only each other. Activity events supersede both groups.
     const READ_STATE_THREAD_EVENT_TYPES = ["thread.visited", "thread.marked-unread"];
+    // Older clients skip tag events, so these supersede only each other.
+    const TAG_THREAD_EVENT_TYPE = "thread.tags-updated";
 
     const supersedableThreadEventTypes = new Set(SUPERSEDABLE_THREAD_EVENT_TYPES);
     const readStateThreadEventTypes = new Set(READ_STATE_THREAD_EVENT_TYPES);
-    // Keep subagent.updated and turn-item.updated rows: slimmed payloads reference their prompts.
-    // Bound each reader request and writer delete, including when the reader
-    // worker is unavailable and discovery falls back to the writer.
+    // Subagent snapshots stay intact because later rows can reference an earlier prompt.
+    // Commanded turn items stay for command-result replay.
+    // Small pages bound work on the reader worker and synchronous fallback.
     const COMPACTION_PAGE_SIZE = 50;
 
-    /** Retain newest and oldest keyed events to preserve client insertion order; page all events to bound sparse scans.
-     * Keep turn-item.updated because replay assigns positions on first write. */
+    // Keep first/latest keyed events for replay order; page every event to bound sparse scans.
     const compactEventStore = Effect.fn("ProjectionMaintenance.compactEventStore")(function* (
       betweenPages: Effect.Effect<void> = Effect.void,
     ) {
@@ -244,6 +245,7 @@ export const layer: Layer.Layer<
       let throughReceiptRowId = bounds[0]?.receipt_row_id ?? 0;
       const retainedThreadIds = new Set<string>();
       const retainedReadStateThreadIds = new Set<string>();
+      const retainedTagThreadIds = new Set<string>();
       // Retain each key's oldest candidate, deleting it only when an older event appears.
       const oldestCandidateByEntityKey = new Map<string, number | null>();
       let deletedEventCount = 0;
@@ -268,6 +270,11 @@ export const layer: Layer.Layer<
             CASE
               WHEN event.application_event_version = 2
                 AND event.event_type IN ('message.updated', 'node.updated')
+              THEN json_extract(event.payload_json, '$.id')
+              WHEN event.application_event_version = 2
+                AND event.event_type = 'turn-item.updated'
+                AND event.command_id IS NULL
+                AND json_extract(event.payload_json, '$.type') <> 'subagent'
               THEN json_extract(event.payload_json, '$.id')
               WHEN event.application_event_version = 2
                 AND event.event_type = 'thread.pull-request-link-updated'
@@ -313,6 +320,13 @@ export const layer: Layer.Layer<
                 obsolete.push(row.sequence);
               } else retainedReadStateThreadIds.add(row.stream_id);
             } else if (
+              row.aggregate_kind === "thread" &&
+              row.event_type === TAG_THREAD_EVENT_TYPE
+            ) {
+              if (retainedThreadIds.has(row.stream_id) || retainedTagThreadIds.has(row.stream_id)) {
+                obsolete.push(row.sequence);
+              } else retainedTagThreadIds.add(row.stream_id);
+            } else if (
               row.event_type === "thread.pull-request-link-updated" &&
               retainedThreadIds.has(row.stream_id)
             ) {
@@ -321,7 +335,8 @@ export const layer: Layer.Layer<
             } else if (
               row.event_type === "thread.pull-request-link-updated" ||
               row.event_type === "message.updated" ||
-              row.event_type === "node.updated"
+              row.event_type === "node.updated" ||
+              (row.event_type === "turn-item.updated" && row.entity_id !== null)
             ) {
               const key = encodeEntityKey([row.event_type, row.stream_id, row.entity_id]);
               const candidate = oldestCandidateByEntityKey.get(key);
