@@ -1141,7 +1141,7 @@ const make = Effect.gen(function* () {
         commandId: input.commandId,
         projectId: thread.projectId,
         workspaceStrategy: reuse?.strategy ?? workspacePreparation,
-        providerInstanceId: projection.thread.modelSelection.instanceId,
+        providerInstanceId: thread.modelSelection.instanceId,
         ...(reuse === null ? {} : { reusedWorktree: reuse.reusedWorktree }),
         ...(message === undefined
           ? {}
