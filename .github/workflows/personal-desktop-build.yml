@@ -3,7 +3,7 @@ name: Personal desktop build
 # Manual build of the Windows and Linux desktop installers for this fork.
 # Not the production release pipeline (see release-desktop.yml) — this is a
 # simplified build using the local branch as-is, without code signing or
-# relay tracing config, following docs/t3-code-windows-build.md and the
+# relay tracing config, following docs/t3-code-custom-build.md and the
 # personal Linux build doc. Does not embed a WSL runtime; Tailscale HTTPS
 # doesn't need one, it just shells out to a tailscale CLI already on the
 # host machine.
