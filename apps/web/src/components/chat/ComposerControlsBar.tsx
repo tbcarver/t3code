@@ -172,7 +172,8 @@ export function ComposerControlsBar(props: {
           id: "mode",
           content: (
             <ComposerFooterModeControls
-              showInteractionModeToggle={planModeUiEnabled}
+              // tyler: Build/Plan hidden; /plan and /default switch modes
+              showInteractionModeToggle={false}
               interactionMode={interactionMode}
               runtimeMode={compatibleRuntimeMode}
               runtimeModeOptions={compatibleRuntimeModeOptions}
