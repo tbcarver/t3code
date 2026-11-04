@@ -203,6 +203,7 @@ import {
 } from "./ComposerAttachmentStrip";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
+import { ComposerNewThreadHereButton } from "./ComposerNewThreadHereButton";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
 import { ComposerPlanFollowUpBanner } from "./ComposerPlanFollowUpBanner";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
@@ -3500,6 +3501,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     data-chat-composer-footer-controls="true"
                     className="relative flex min-w-0 flex-1 items-center justify-end gap-0.5"
                   >
+                    {routeKind === "server" ? (
+                      <ComposerNewThreadHereButton thread={activeThread} />
+                    ) : null}
                     {composerControls}
                   </div>
                   <ComposerFooterPrimaryActions
