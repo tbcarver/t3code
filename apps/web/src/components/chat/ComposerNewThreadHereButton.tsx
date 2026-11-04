@@ -39,7 +39,7 @@ export function ComposerNewThreadHereButton({ thread }: { thread: Thread | undef
         render={
           <Button
             type="button"
-            variant="ghost"
+            variant="ghost-muted"
             size="icon-sm"
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => void startThread()}
