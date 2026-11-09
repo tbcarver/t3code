@@ -212,7 +212,19 @@ jobs:
           node scripts/update-release-package-versions.ts "$version"
 
       - name: Build desktop installer
+        env:
+          T3CODE_DESKTOP_KEEP_STAGE: ${{ runner.os == 'Windows' }}
         run: corepack pnpm ${{ matrix.script }}
+
+      # Upstream caps the Windows payload at 80 files; list them when the cap trips.
+      - name: List Windows payload files
+        if: failure() && runner.os == 'Windows'
+        shell: bash
+        run: |
+          for dir in "$RUNNER_TEMP"/t3code-desktop-win-stage-*/ "${TEMP:-/tmp}"/t3code-desktop-win-stage-*/; do
+            [ -d "$dir" ] || continue
+            find "$dir" -path '*-unpacked/*' -type f | sed "s#^$dir##" | sort
+          done
 
       - name: Upload installer
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
