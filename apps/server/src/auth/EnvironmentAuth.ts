@@ -80,7 +80,8 @@ export interface IssuedBearerSession {
 
 // MCP client tokens are restricted to /mcp; HTTP API and WebSocket RPC would bypass their access cap.
 const MCP_CLIENT_SUBJECT = "mcp-client";
-const MCP_CLIENT_SESSION_TTL = Duration.days(30);
+// tyler: a year, matching the session TTL in SessionStore.ts.
+const MCP_CLIENT_SESSION_TTL = Duration.days(365);
 
 export interface McpClientSession {
   readonly sessionId: AuthSessionId;

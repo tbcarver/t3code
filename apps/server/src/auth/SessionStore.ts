@@ -445,7 +445,8 @@ export class SessionStore extends Context.Service<
 >()("t3/auth/SessionStore") {}
 
 const SIGNING_SECRET_NAME = "server-signing-key";
-const DEFAULT_SESSION_TTL = Duration.days(30);
+// tyler: a year, not 30 days, so paired devices across the fleet don't all expire together.
+const DEFAULT_SESSION_TTL = Duration.days(365);
 const DEFAULT_WEBSOCKET_TOKEN_TTL = Duration.minutes(5);
 
 const SessionClaims = Schema.Struct({
