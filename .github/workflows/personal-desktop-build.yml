@@ -52,7 +52,8 @@ jobs:
   linux-cli-archive:
     name: Build Linux CLI archive
     if: ${{ inputs.mode != 'check' }}
-    runs-on: ubuntu-latest
+    # tyler: 24.04, not latest: natives built on newer glibc than 2.39 fail the AppImage check and the HP (Ubuntu 24.04).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -156,7 +157,7 @@ jobs:
             rust_target: x86_64-pc-windows-msvc
             artifact_glob: release/*.exe
           - label: linux-x64
-            os: ubuntu-latest
+            os: ubuntu-24.04
             script: dist:desktop:linux
             rust_target: x86_64-unknown-linux-gnu
             artifact_glob: release/*.AppImage

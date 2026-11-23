@@ -1064,8 +1064,8 @@ export function resolveWindowsServerAsarIgnoreGlobs(arch: typeof BuildArch.Type)
   ];
 }
 
-// tyler: 100, not 80; a Windows-runner build also packs node-pty builds and ia32 natives.
-export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 100;
+// tyler: 120, not 80; a Windows-runner build also packs node-pty builds and ia32 natives (105 files at 0.1.12).
+export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 120;
 export const WINDOWS_SERVER_RESOURCE_SOURCE_DIR = "apps/desktop/prod-resources/windows-server";
 export const WINDOWS_SERVER_EXTRA_RESOURCES = [
   {
