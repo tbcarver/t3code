@@ -3,11 +3,11 @@ import type { EnvironmentId, ProviderInstanceId, ServerProvider } from "@t3tools
 import {
   collectLimitAccounts,
   collectLimitPools,
-  formatDuration,
   type LimitAccount,
   type LimitPool,
   type LimitPoolWindow,
 } from "@t3tools/shared/usageLimits";
+import { formatDuration } from "@t3tools/shared/usageLimitsCopy";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { memo, useCallback, useEffect, useMemo } from "react";
 
